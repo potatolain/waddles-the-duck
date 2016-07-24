@@ -1,0 +1,10 @@
+bin
+!bin/empty
+tools/fceux/*
+!tools/fceux/README.md
+tools/nessc/*
+!tools/nessc/README.md
+tools/nintendulatordx/*
+!tools/nintendulatordx/README.md
+tools/readnes3/*
+!tools/readnes3/README.md
