@@ -3,7 +3,7 @@ title_palettes:
 	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
 
 title_chr_data: 
-	.incbin "graphics/base_graphics.chr"
+	.incbin "graphics/title_tiles.chr"
 	
 load_title: 
 	jsr disable_all
@@ -68,4 +68,18 @@ show_title:
 	jsr load_title
 	
 	@loopa: 
+		jsr read_controller
+		
+		; Check for start button...
+
+		; Make sure we don't count keypresses from last cycle.
+		lda lastCtrlButtons
+		eor #$ff ; flip the bits.
+		and ctrlButtons
+		
+		and #CONTROLLER_START
+		bne @game_time
+		jsr vblank_wait
 		jmp @loopa
+	@game_time: 
+		jmp show_level

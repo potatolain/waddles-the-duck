@@ -8,3 +8,4 @@ tools/nintendulatordx/*
 !tools/nintendulatordx/README.md
 tools/readnes3/*
 !tools/readnes3/README.md
+*.o
