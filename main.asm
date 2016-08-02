@@ -26,6 +26,7 @@
 	ppuCtrlBuffer: 		.res 1
 	ppuMaskBuffer: 		.res 1
 	tempAddr: 			.res 2
+	levelAddr: 			.res 2
 	scrollX:			.res 1
 	scrollY:			.res 1
 	ctrlButtons:		.res 1
@@ -181,25 +182,93 @@ load_graphics_data:
 	rts
 	
 load_level: 
+	
+	lda #0
+	sta temp1
+	
 	ldx #0
-	@loop: 
-		lda screen0, x
-		sta SCREEN_1_DATA, x
-		inx
-		cpx #0
-		bne @loop
+	stx temp2
+	; TODO: Consider levels > 255 tiles long. Are those realistic?
+	; TODO: This hackishly assumes exactly a sane number of bytes are provided. How do we extend this to not draw more than 2xnametable?
+	@loop:
+		lda lvl1_compressed, x
 		
-	@loop2: 
-		lda screen1, x
-		sta SCREEN_2_DATA, x
-		inx
-		cpx #0
-		bne @loop2
+		cmp #$ff
+		beq @level_loaded
+		
+		sta tempAddr
+		lda #0
+		sta tempAddr+1
+		
+		.repeat 4
+			asl tempAddr
+			rol tempAddr+1
+		.endrepeat
+		
+		lda tempAddr
+		clc
+		adc #<(lvl1_compressed_ids)
+		sta tempAddr
 
+		lda tempAddr+1
+		adc #>(lvl1_compressed_ids)
+		sta tempAddr+1
+				
+		ldy #0
+		
+		; In this inner loop, x must be 1-16 to avoid starting lower on the level than expected in cases
+		; Where we load more than one screen at once. temp2 = x%16.
+		stx temp1
+		ldx temp2
+		cpx #16
+		bne @do_it
+		ldx #0
+		stx temp2
+		
+		@do_it:
+		lda temp5
+		cmp #0
+		beq @inner_loop_nametable_1
+		jmp @inner_loop_nametable_2
+		
+		@inner_loop_nametable_1:
+			lda (tempAddr), y
+			sta SCREEN_1_DATA, x
+			iny
+			txa
+			clc
+			adc #$10
+			tax
+			cpy #16
+			bne @inner_loop_nametable_1
+			jmp @done_it
+			
+		@inner_loop_nametable_2:
+			lda (tempAddr), y
+			sta SCREEN_2_DATA, x
+			iny
+			txa
+			clc
+			adc #$10
+			tax
+			cpy #16
+			bne @inner_loop_nametable_2
+
+		@done_it:
+		inc temp2
+		ldx temp1
+		inx
+		cpx #16
+		bne @loop ; Switch to nametable 2 if we go over the first table's bytes.
+			lda #1
+			sta temp5
+		jmp @loop
+	
+	@level_loaded: 
 	rts
 	
 load_nametable:
-	set_ppu_addr $2000
+	set_ppu_addr $20c0
 	lda #<(SCREEN_1_DATA)
 	sta tempAddr
 	lda #>(SCREEN_1_DATA)
@@ -208,7 +277,7 @@ load_nametable:
 	ldx #0
 	ldy #0
 	sty temp5
-	clc ; HAX: Don't want to clc during this thing repeatedly, so do it once to avoid an off-by-one error.
+	clc ; HAX: Don't want to clc during this thing repeatedly, so do it once to avoid an off-by-one error. (hopefully)
 	@outer_loop:
 		txa
 		.repeat 4
@@ -248,7 +317,7 @@ load_nametable:
 			
 		ldx temp0
 		inx
-		cpx #15
+		cpx #12
 		bne @outer_loop
 		
 	lda temp5
@@ -261,7 +330,7 @@ load_nametable:
 	sta tempAddr
 	lda #>(SCREEN_2_DATA)
 	sta tempAddr+1
-	set_ppu_addr $2400
+	set_ppu_addr $24c0
 	jmp @outer_loop
 	@dont_reloop:
 		
