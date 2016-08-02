@@ -12,8 +12,6 @@
 	store scrollX, PPU_SCROLL
 	store scrollY, PPU_SCROLL
 
-	lda #1
-	sta graphicsState
 .endmacro
 
 .macro store_ppu_data aa, bb, cc, dd, ee, ff, gg, hh, ii, jj, kk, ll, mm, nn, oo, pp, qq, rr, ss, tt, uu, vv, ww, xx, yy, zz

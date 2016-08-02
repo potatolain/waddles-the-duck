@@ -1,4 +1,4 @@
-.define  		BUILD 			309  
+.define  		BUILD 			382  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Sun 07/31/2016 18:33" 
-.define 		SPLASH_MESSAGE 	"Afraid of ducks" 
+.define 		BUILD_DATE		"Mon 08/01/2016 22:12" 
+.define 		SPLASH_MESSAGE 	"Honk?" 

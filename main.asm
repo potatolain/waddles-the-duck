@@ -2,6 +2,7 @@
 .include "lib/nes_constants.asm"
 .include "lib/project_constants.asm"
 .include "lib/nes_macros.asm"
+.include "lib/tile_definitions.asm"
 
 .segment "INESHDR"
 	
@@ -22,7 +23,6 @@
 	temp4: 				.res 1
 	temp5:				.res 1
 	frameCounter: 		.res 1
-	graphicsState:		.res 1
 	ppuCtrlBuffer: 		.res 1
 	ppuMaskBuffer: 		.res 1
 	tempAddr: 			.res 2
@@ -39,11 +39,14 @@
 	SCREEN_1_DATA			= $600
 	SCREEN_2_DATA			= $700
 	SPRITE_DATA				= $200
+	SPRITE_ZERO				= $200
+	PLAYER_SPRITE			= $210
 	
 	PLAYER_VELOCITY_NORMAL 	= $01
 	PLAYER_VELOCITY_FAST	= $03
 	PLAYER_DIRECTION_LEFT	= $3
 	PLAYER_DIRECTION_RIGHT	= $0
+	SPRITE_ZERO_POSITION	= $27
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -286,33 +289,33 @@ load_nametable:
 	rts
 	
 initialize_player_sprite: 
-	store #$af, SPRITE_DATA
-	store #$01, SPRITE_DATA+1
-	store #$0, SPRITE_DATA+2
-	store #$20, SPRITE_DATA+3
+	store #$af, PLAYER_SPRITE
+	store #$01, PLAYER_SPRITE+1
+	store #$0, PLAYER_SPRITE+2
+	store #$20, PLAYER_SPRITE+3
 	
-	store #$b7, SPRITE_DATA+4
-	store #$11, SPRITE_DATA+5
-	store #$0, SPRITE_DATA+6
-	store #$20, SPRITE_DATA+7
+	store #$b7, PLAYER_SPRITE+4
+	store #$11, PLAYER_SPRITE+5
+	store #$0, PLAYER_SPRITE+6
+	store #$20, PLAYER_SPRITE+7
 	rts
 
 	
 do_player_movement: 
-	lda SPRITE_DATA+3
+	lda PLAYER_SPRITE+3
 	clc
 	adc playerVelocity
-	sta SPRITE_DATA+3
-	sta SPRITE_DATA+7
+	sta PLAYER_SPRITE+3
+	sta PLAYER_SPRITE+7
 	
 	lda playerVelocity
 	cmp #0
 	bne @continue
 		lda playerDirection
-		sta SPRITE_DATA+1
+		sta PLAYER_SPRITE+1
 		clc
 		adc #$10
-		sta SPRITE_DATA+5
+		sta PLAYER_SPRITE+5
 		rts
 		
 	@continue:
@@ -332,15 +335,15 @@ do_player_movement:
 	@after_flop: 
 	clc
 	adc playerDirection
-	sta SPRITE_DATA+1
+	sta PLAYER_SPRITE+1
 	clc
 	adc #$10
-	sta SPRITE_DATA+5
+	sta PLAYER_SPRITE+5
 	
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @not_left
-		lda SPRITE_DATA+3
+		lda PLAYER_SPRITE+3
 		cmp #MIN_POSITION_LEFT_SCROLL
 		bcc @do_scroll_l
 		jmp @dont_scroll
@@ -348,7 +351,7 @@ do_player_movement:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_RIGHT
 	bne @dont_scroll
-		lda SPRITE_DATA+3
+		lda PLAYER_SPRITE+3
 		cmp #MIN_POSITION_RIGHT_SCROLL
 		bcs @do_scroll_r
 		jmp @dont_scroll
@@ -358,7 +361,6 @@ do_player_movement:
 		clc
 		adc playerVelocity
 		sta scrollX
-		sta graphicsState
 		
 		; If we didn't carry, it's time to swap nametables.
 		bcs @dont_swap_nametable
@@ -373,7 +375,6 @@ do_player_movement:
 		clc
 		adc playerVelocity
 		sta scrollX
-		sta graphicsState
 		
 		; If we carried, it's time to swap nametables.
 		bcc @dont_swap_nametable
@@ -383,11 +384,11 @@ do_player_movement:
 		@dont_swap_nametable:
 		
 		; TODO: We're reversing something we did earlier here... there's likely a way to refactor this to not be necessary if we need some cycles back.
-		lda SPRITE_DATA+3
+		lda PLAYER_SPRITE+3
 		sec
 		sbc playerVelocity
-		sta SPRITE_DATA+3
-		sta SPRITE_DATA+7
+		sta PLAYER_SPRITE+3
+		sta PLAYER_SPRITE+7
 	@dont_scroll: 
 
 	rts
@@ -433,9 +434,22 @@ handle_main_input:
 		
 	rts
 	
+load_sprite0:
+	lda #$ff
+	sta SPRITE_ZERO+1
+	lda #%00000000
+	sta SPRITE_ZERO+2
+	lda #$f0
+	sta SPRITE_ZERO+3
+	; set y last as we test on it.
+	lda #SPRITE_ZERO_POSITION
+	sta SPRITE_ZERO
+
+	rts
+	
 main_loop: 
 	jsr handle_main_input
-	jsr do_temp_sprite_stuff
+	jsr do_player_movement
 	jsr vblank_wait
 	jmp main_loop
 	
@@ -444,8 +458,11 @@ show_level:
 	jsr vblank_wait
 	jsr load_graphics_data
 	jsr load_level
+	; FIXME: Kill first 2 rows of input (ish) for this, update views.
 	jsr load_nametable
+	jsr show_hud
 	jsr enable_all
+	jsr load_sprite0
 	reset_ppu_scrolling
 	lda #PLAYER_DIRECTION_RIGHT
 	sta playerDirection
@@ -455,8 +472,6 @@ show_level:
 disable_all:
 	ldx #$00
 	stx ppuMaskBuffer	; disable rendering
-	ldx #1
-	stx graphicsState
 	rts
 	
 disable_all_immediate:
@@ -470,7 +485,6 @@ enable_all:
 	sta	ppuMaskBuffer	;  no clipping on left
 	; If you're running this, we have to assume you are not currently running... so skip the buffer.
 	sta PPU_MASK
-	sta graphicsState
 	rts
 
 vblank_wait: 
@@ -481,6 +495,7 @@ vblank_wait:
 	rts
 	
 .include "lib/controller.asm"
+.include "lib/hud.asm"
 	
 ;;; 
 ;;; Nmi handler
@@ -491,30 +506,57 @@ nmi:
     pha
     tya
     pha
-		
+	
 	; Reminder: NO shared variables here. If you share them, make damn sure you save them before, and pop em after!
 	inc frameCounter
 	lda	#$00		; set the low byte (00) of the RAM address
-	sta	$2003
+	sta	OAM_ADDR
+	
 	; Game sprites
 	lda	#$02		; set the high byte (02) of the RAM address 
-	sta	$4014		; start the transfer
+	sta	OAM_DMA		; start the transfer
+
 	
-	lda graphicsState
-	cmp #0
-	beq @nochange
-		lda ppuCtrlBuffer
-		sta PPU_CTRL
-		lda ppuMaskBuffer
-		sta PPU_MASK
+	lda SPRITE_ZERO
+	cmp #SPRITE_ZERO_POSITION
+	bne @skip_sprite0
+	
+	; Sprite zero trickery.. set flags so we go right
+	lda PPU_STATUS
+	lda #$00
+	sta PPU_ADDR
+	sta PPU_ADDR
+	lda #0
+	sta PPU_SCROLL
+	sta PPU_SCROLL
+		
+	
+	@waitNotSprite0: ; flag off...
+		lda $2002
+		and #%01000000
+		bne @waitNotSprite0
+	@waitSprite0: ; flag on...
+		lda $2002
+		and #%01000000
+		beq @waitSprite0
+		
+	; Ensure we really got to the end of the scanline.
+	ldx #$10
+	@waitEndOfSprite:
+		dex
+		bne @waitEndOfSprite
+	
+	; Your regularly scheduled programming
+	@skip_sprite0:
+	lda ppuCtrlBuffer
+	sta PPU_CTRL
+	lda ppuMaskBuffer
+	sta PPU_MASK
 
-		lda PPU_STATUS
-		store scrollX, PPU_SCROLL
-		store scrollY, PPU_SCROLL
+	lda PPU_STATUS
+	store scrollX, PPU_SCROLL
+	store scrollY, PPU_SCROLL
 
-		lda #0
-		sta graphicsState
-	@nochange: 
 	
     pla ; restore regs
     tay
@@ -522,7 +564,7 @@ nmi:
     tax
     pla
 	
-	rti				; return from interrupt
+	rti
 	
 	.include "title.asm"
 	.include "levels/lvl1.asm"
