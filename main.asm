@@ -527,7 +527,6 @@ show_level:
 	jsr vblank_wait
 	jsr load_graphics_data
 	jsr load_level
-	; FIXME: Kill first 2 rows of input (ish) for this, update views.
 	jsr load_nametable
 	jsr show_hud
 	jsr enable_all
