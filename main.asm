@@ -188,8 +188,6 @@ load_level:
 	
 	ldx #0
 	stx temp2
-	; TODO: Consider levels > 255 tiles long. Are those realistic?
-	; TODO: This hackishly assumes exactly a sane number of bytes are provided. How do we extend this to not draw more than 2xnametable?
 	@loop:
 		lda lvl1_compressed, x
 		
@@ -258,6 +256,8 @@ load_level:
 		inc temp2
 		ldx temp1
 		inx
+		cpx #32
+		beq @level_loaded
 		cpx #16
 		bne @loop ; Switch to nametable 2 if we go over the first table's bytes.
 			lda #1
@@ -358,15 +358,37 @@ load_nametable:
 	rts
 	
 initialize_player_sprite: 
-	store #$af, PLAYER_SPRITE
-	store #$01, PLAYER_SPRITE+1
+	store #$a7, PLAYER_SPRITE
+	store #$0, PLAYER_SPRITE+1
 	store #$0, PLAYER_SPRITE+2
 	store #$20, PLAYER_SPRITE+3
 	
-	store #$b7, PLAYER_SPRITE+4
-	store #$11, PLAYER_SPRITE+5
+	store #$af, PLAYER_SPRITE+4
+	store #$10, PLAYER_SPRITE+5
 	store #$0, PLAYER_SPRITE+6
 	store #$20, PLAYER_SPRITE+7
+	
+	store #$b7, PLAYER_SPRITE+8
+	store #$20, PLAYER_SPRITE+9
+	store #$0, PLAYER_SPRITE+10
+	store #$20, PLAYER_SPRITE+11
+	
+	store #$a7, PLAYER_SPRITE+12
+	store #$01, PLAYER_SPRITE+13
+	store #$0, PLAYER_SPRITE+14
+	store #$28, PLAYER_SPRITE+15
+	
+	store #$af, PLAYER_SPRITE+16
+	store #$11, PLAYER_SPRITE+17
+	store #$0, PLAYER_SPRITE+18
+	store #$28, PLAYER_SPRITE+19
+	
+	store #$b7, PLAYER_SPRITE+20
+	store #$21, PLAYER_SPRITE+21 
+	store #$0, PLAYER_SPRITE+22
+	store #$28, PLAYER_SPRITE+23
+	
+	
 	rts
 
 	
@@ -376,15 +398,35 @@ do_player_movement:
 	adc playerVelocity
 	sta PLAYER_SPRITE+3
 	sta PLAYER_SPRITE+7
+	sta PLAYER_SPRITE+11
+
+	clc
+	adc #8
+	sta PLAYER_SPRITE+15
+	sta PLAYER_SPRITE+19
+	sta PLAYER_SPRITE+23
 	
 	lda playerVelocity
 	cmp #0
 	bne @continue
 		lda playerDirection
+		asl
 		sta PLAYER_SPRITE+1
 		clc
 		adc #$10
 		sta PLAYER_SPRITE+5
+		clc 
+		adc #$10
+		sta PLAYER_SPRITE+9
+		clc
+		adc #1
+		sta PLAYER_SPRITE+21
+		sec
+		sbc #$10
+		sta PLAYER_SPRITE+17
+		sec
+		sbc #$10
+		sta PLAYER_SPRITE+13
 		rts
 		
 	@continue:
@@ -402,13 +444,28 @@ do_player_movement:
 		clc
 		adc #1
 	@after_flop: 
+	asl
 	clc
 	adc playerDirection
+	adc playerDirection ; Sprites are two wide, so double it.
 	sta PLAYER_SPRITE+1
 	clc
 	adc #$10
 	sta PLAYER_SPRITE+5
-	
+	clc
+	adc #$10
+	sta PLAYER_SPRITE+9
+	clc
+	adc #1
+	sta PLAYER_SPRITE+21
+	sec
+	sbc #$10
+	sta PLAYER_SPRITE+17
+	sec
+	sbc #$10
+	sta PLAYER_SPRITE+13
+	; FIXME cheater.
+	;jmp @dont_scroll
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @not_left
@@ -458,6 +515,12 @@ do_player_movement:
 		sbc playerVelocity
 		sta PLAYER_SPRITE+3
 		sta PLAYER_SPRITE+7
+		sta PLAYER_SPRITE+11
+		clc
+		adc #8
+		sta PLAYER_SPRITE+15
+		sta PLAYER_SPRITE+19
+		sta PLAYER_SPRITE+23
 	@dont_scroll: 
 
 	rts
