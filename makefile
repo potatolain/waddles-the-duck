@@ -28,10 +28,11 @@ SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(sh
 # In theory, every part of this makefile should work on Linux/Mac OS. If you find issues, report em!
 ifeq ($(OS),Windows_NT)
 	BUILD_DATE=$(shell echo %DATE% %TIME:~0,5%)
+	UPLOADER=tools\uploader\upload.bat
 else
 	BUILD_DATE=$(shell date +"%a %m/%d/%Y  %H:%M")
+	UPLOADER=tools/uploader/upload.sh
 endif
-
 
 all: generate_constants build 
 
@@ -66,3 +67,6 @@ prepare_cart:
 
 space_check:
 	$(SPACE_CHECKER) bin/main.nes
+
+upload: 
+	$(UPLOADER) bin/main.nes

@@ -12,45 +12,68 @@
 	.byte $21        ; lower mapper nibble, enable SRAM
 	.byte $00        ; upper mapper nibble
 
+; Memory map: 
+; $000-0ff: zp values
+; $100-1ff: Stack
+; $200-2ff: Sprites
+; $300-4ff: Unused
+; $500-53f: Screen buffer
+; $520-5ff: Unused.
+; $600-7ff: World map data.
+	
+	
 .segment "ZEROPAGE"
 	; 6 "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
-	temp0: 				.res 1
-	temp1: 				.res 1
-	temp2:				.res 1
-	temp3: 				.res 1
-	temp4: 				.res 1
-	temp5:				.res 1
-	frameCounter: 		.res 1
-	ppuCtrlBuffer: 		.res 1
-	ppuMaskBuffer: 		.res 1
-	tempAddr: 			.res 2
-	levelAddr: 			.res 2
-	scrollX:			.res 1
-	scrollY:			.res 1
-	ctrlButtons:		.res 1
-	lastCtrlButtons:	.res 1
-	playerVelocity:		.res 1
-	playerDirection:	.res 1
+	temp0: 					.res 1
+	temp1: 					.res 1
+	temp2:					.res 1
+	temp3: 					.res 1
+	temp4: 					.res 1
+	temp5:					.res 1
+	levelPosition: 			.res 1
+	levelPositionExact:		.res 1
+	levelPositionExactP1:	.res 1
+	screenScroll:			.res 1
+	levelScrollL:			.res 1
+	levelMemPosR:			.res 1
+	frameCounter: 			.res 1
+	ppuCtrlBuffer:			.res 1
+	ppuMaskBuffer: 			.res 1
+	tempAddr: 				.res 2
+	levelAddr: 				.res 2
+	nametableAddr:			.res 2
+	scrollX:				.res 1
+	scrollY:				.res 1
+	ctrlButtons:			.res 1
+	lastCtrlButtons:		.res 1
+	playerVelocity:			.res 1
+	playerDirection:		.res 1
 	
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
 	CHAR_SPACE				= $ff
 	SCREEN_1_DATA			= $600
 	SCREEN_2_DATA			= $700
+	NEXT_ROW_CACHE			= $500
 	SPRITE_DATA				= $200
 	SPRITE_ZERO				= $200
 	PLAYER_SPRITE			= $210
 	
 	PLAYER_VELOCITY_NORMAL 	= $01
-	PLAYER_VELOCITY_FAST	= $03
+	PLAYER_VELOCITY_FAST	= $02
 	PLAYER_DIRECTION_LEFT	= $3
 	PLAYER_DIRECTION_RIGHT	= $0
 	SPRITE_ZERO_POSITION	= $27
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
+	MIN_LEFT_LEVEL_POSITION 		= $0f
+	
+	WINDOW_WIDTH			= 32
+	WINDOW_WIDTH_TILES		= 16
+	BOTTOM_HUD_TILE			= $c0
 	
 	
 	
@@ -183,8 +206,21 @@ load_graphics_data:
 	
 load_level: 
 	
+	lda #$0f
+	sta levelPosition
+	lda #0
+	sta screenScroll
+	sta levelPositionExact+1
 	lda #0
 	sta temp1
+	lda #$fe
+	sta levelPositionExact
+	
+	; Prep nametableAddr with the position we should start on nametable 2
+	lda #BOTTOM_HUD_TILE
+	sta nametableAddr
+	lda #$24
+	sta nametableAddr+1
 	
 	ldx #0
 	stx temp2
@@ -320,20 +356,6 @@ load_nametable:
 		cpx #12
 		bne @outer_loop
 		
-	lda temp5
-	cmp #1
-	beq @dont_reloop
-	ldx #0
-	ldy #0
-	inc temp5
-	lda #<(SCREEN_2_DATA)
-	sta tempAddr
-	lda #>(SCREEN_2_DATA)
-	sta tempAddr+1
-	set_ppu_addr $24c0
-	jmp @outer_loop
-	@dont_reloop:
-		
 	; FIXME: Replace this with real attr loading
 	set_ppu_addr $23c0
 	lda #0
@@ -344,6 +366,7 @@ load_nametable:
 		cpy #$40
 		bne @clear_attributes
 		
+	; FIXME: Shouldn't really need to do this.
 	set_ppu_addr $27c0
 	lda #0
 	ldy #0
@@ -353,8 +376,6 @@ load_nametable:
 		cpy #$40
 		bne @clear_attributes2
 		
-	;@loop_pal
-	;	lda SCREEN_1_DATA, x
 	rts
 	
 initialize_player_sprite: 
@@ -391,8 +412,255 @@ initialize_player_sprite:
 	
 	rts
 
+load_current_line:
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_LEFT
+	bne @right
+		lda levelPosition
+		sec
+		sbc #WINDOW_WIDTH_TILES+3
+		tay
+		lda screenScroll
+		clc
+		adc #16
+		sta temp4
+		cmp #32
+		bcs @go
+		sec
+		sbc #32
+		sta temp4
+		jmp @go
+	@right: 
+		ldy levelPosition
+		lda screenScroll 
+		sta temp4
+	@go:
+	
+	lda #0
+	sta tempAddr+1
+	lda lvl1_compressed, y
+	.repeat 4
+		asl
+		rol tempAddr+1
+	.endrepeat
+	clc
+	adc #<(lvl1_compressed_ids)
+	sta tempAddr
+	lda tempAddr+1
+	adc #>(lvl1_compressed_ids)
+	sta tempAddr+1
+	
+	ldy #0
+	ldx temp4
+	cpx #16
+	bcc @loop_l
+	
+	txa
+	sec
+	sbc #16
+	tax
+	
+	@loop_r:
+	
+		lda (tempAddr), y
+		sta SCREEN_2_DATA, x
+		jsr draw_to_cache
+		bne @loop_r
+	rts
+	
+	@loop_l:
+		lda (tempAddr), y
+		sta SCREEN_1_DATA, x
+		jsr draw_to_cache
+		bne @loop_l
+
+	rts
+	
+; Draws the tile in a to the next 4 positions in NEXT_ROW_CACHE. 
+; Very tightly coupled to load_current_line. Moved to reduce complexity.
+draw_to_cache: 
+	pha
+	sty temp0
+	tya
+	asl
+	tay
+	pla
+	asl
+	sta NEXT_ROW_CACHE, y
+	clc
+	adc #$10
+	iny 
+	sta NEXT_ROW_CACHE, y
+	pha
+	tya
+	clc
+	adc #$1f
+	tay
+	pla
+	sec
+	sbc #$0f
+	sta NEXT_ROW_CACHE, y
+	iny
+	clc
+	adc #$10
+	sta NEXT_ROW_CACHE, y
+	ldy temp0
+	iny
+	txa
+	clc
+	adc #16
+	tax
+	cpy #16
+
+	rts
+	
+draw_current_nametable_row:
+	
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_LEFT
+	bne @right
+		; left
+		lda levelPosition
+		sec
+		sbc #WINDOW_WIDTH_TILES+3
+		sta temp5
+		jmp @go
+	@right: 
+		lda levelPosition
+		sta temp5
+		jmp @go
+	
+	@go:
+	lda temp5
+	and #%00001111
+	sta temp1
+	asl ; x2 because we want nametable addr, not map addr
+	clc
+	adc #BOTTOM_HUD_TILE
+	sta nametableAddr
+	
+	; TODO: This feels kinda clumsy/inefficient. Is there a smarter way?
+	lda temp5
+	and #%00010000
+	lsr
+	lsr
+	sta temp1
+	lda nametableAddr+1
+	and #%11111011
+	clc
+	adc temp1
+	sta nametableAddr+1
+
+	
+	lda PPU_STATUS
+	store nametableAddr+1, PPU_ADDR
+	store nametableAddr, PPU_ADDR
+
+
+	ldx #0
+	@looper: 
+		lda NEXT_ROW_CACHE, x
+		sta PPU_DATA
+		inx
+		cpx #24 ; 32 - 8 rows for sprite 0 header stuff
+		bne @looper
+		
+	lda PPU_STATUS
+	lda nametableAddr
+	clc
+	adc #$1
+	sta nametableAddr
+	lda nametableAddr+1
+	adc #0
+	sta nametableAddr+1
+	sta PPU_ADDR
+	lda nametableAddr
+	sta PPU_ADDR
+	
+	ldx #32
+	@looper2: 
+		lda NEXT_ROW_CACHE, x
+		sta PPU_DATA
+		inx
+		cpx #56 ; 64 - 8 rows for sprite 0 header stuff
+		bne @looper2
+
+		
+	reset_ppu_scrolling
+	
+	; FIXME: Also need to figure out how to attributes.
+	rts
+
 	
 do_player_movement: 
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_LEFT
+	bne @move_right
+		lda playerVelocity
+		and #%00000011 ; get it down to a real speed; get rid of potential negation.
+		sta temp0
+		lda levelPositionExact
+		sec
+		sbc temp0
+		sta levelPositionExact
+		sta levelPosition
+		
+		lda levelPositionExact+1
+		sbc #0
+		sta levelPositionExact+1
+		sta temp0
+		jmp @after_move
+	@move_right: 
+		lda levelPositionExact
+		clc
+		adc playerVelocity
+		sta levelPositionExact
+		sta levelPosition
+		
+		lda levelPositionExact+1
+		adc #0
+		sta levelPositionExact+1
+		sta temp0
+	@after_move:
+	
+	lda levelPositionExact+1
+	.repeat 4
+		lsr temp0
+		ror levelPosition
+	.endrepeat
+		
+	
+	lda levelPositionExact
+	and #%00001110
+	cmp #0
+	bne @not_scrollin
+	lda playerVelocity
+	cmp #0
+	beq @not_scrollin
+		lda playerDirection
+		cmp #PLAYER_DIRECTION_LEFT
+		bne @right
+			dec screenScroll
+			lda screenScroll
+			cmp #255
+			bne @nada
+				lda #31
+				sta screenScroll
+			@nada:
+
+			jmp @do_scrollin
+		@right: 
+			inc screenScroll
+			lda screenScroll
+			cmp #32
+			bne @nadab
+				lda #0
+				sta screenScroll
+			@nadab:
+		@do_scrollin:
+		jsr load_current_line
+	@not_scrollin:
+		
 	lda PLAYER_SPRITE+3
 	clc
 	adc playerVelocity
@@ -464,15 +732,17 @@ do_player_movement:
 	sec
 	sbc #$10
 	sta PLAYER_SPRITE+13
-	; FIXME cheater.
-	;jmp @dont_scroll
+
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @not_left
 		lda PLAYER_SPRITE+3
 		cmp #MIN_POSITION_LEFT_SCROLL
-		bcc @do_scroll_l
-		jmp @dont_scroll
+		bcs @dont_scroll
+		lda levelPosition
+		cmp #WINDOW_WIDTH_TILES+2 ; 1 to stretch PAST the window width, and 1 more to deal with bcc, rather than having a beq too.
+		bcc @dont_scroll
+		jmp @do_scroll_l
 	@not_left: 
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_RIGHT
@@ -489,12 +759,14 @@ do_player_movement:
 		sta scrollX
 		
 		; If we didn't carry, it's time to swap nametables.
-		bcs @dont_swap_nametable
+		bcs @dont_swap_nametable_l
 			lda ppuCtrlBuffer
 			eor #%00000001
 			sta ppuCtrlBuffer
-		jmp @dont_swap_nametable
-
+		@dont_swap_nametable_l:
+	
+		jmp @done_scroll
+		
 	
 	@do_scroll_r: 
 		lda scrollX
@@ -503,11 +775,15 @@ do_player_movement:
 		sta scrollX
 		
 		; If we carried, it's time to swap nametables.
-		bcc @dont_swap_nametable
+		bcc @dont_swap_nametable_r
 			lda ppuCtrlBuffer
 			eor #%00000001
 			sta ppuCtrlBuffer
-		@dont_swap_nametable:
+		@dont_swap_nametable_r:
+		
+
+		
+		@done_scroll:
 		
 		; TODO: We're reversing something we did earlier here... there's likely a way to refactor this to not be necessary if we need some cycles back.
 		lda PLAYER_SPRITE+3
@@ -536,6 +812,11 @@ handle_main_input:
 		lda #PLAYER_DIRECTION_LEFT
 		sta playerDirection
 		
+		; If you're at the start of the level, go away. Don't run past the end.
+		lda levelPosition
+		cmp #MIN_LEFT_LEVEL_POSITION
+		bcc @done_left
+		
 		lda ctrlButtons
 		and #CONTROLLER_B
 		bne @fast_left
@@ -563,7 +844,7 @@ handle_main_input:
 		@doit_right: 
 		sta playerVelocity
 	@done_right:
-		
+			
 	rts
 	
 load_sprite0:
@@ -579,15 +860,69 @@ load_sprite0:
 
 	rts
 	
+do_sprite0:
+	lda SPRITE_ZERO
+	cmp #SPRITE_ZERO_POSITION
+	bne @skip_sprite0
+	
+	; Sprite zero trickery.. set flags so we go right
+	lda PPU_STATUS
+	lda #$00
+	sta PPU_ADDR
+	sta PPU_ADDR
+	lda #0
+	sta PPU_SCROLL
+	sta PPU_SCROLL
+		
+	
+	@waitNotSprite0: ; flag off...
+		lda $2002
+		and #%01000000
+		bne @waitNotSprite0
+	@waitSprite0: ; flag on...
+		lda $2002
+		and #%01000000
+		beq @waitSprite0
+		
+	; Ensure we really got to the end of the scanline.
+	ldx #$10
+	@waitEndOfSprite:
+		dex
+		bne @waitEndOfSprite
+	lda PPU_STATUS
+	lda ppuCtrlBuffer
+	sta PPU_CTRL
+	@skip_sprite0:
+	reset_ppu_scrolling
+	rts
+	
 main_loop: 
+
 	jsr handle_main_input
-	jsr do_player_movement
+	jsr do_player_movement	
+	
 	jsr vblank_wait
+	
+	; Not ideal to do this inside vblank...
+	lda #%00001110
+	and levelPositionExact
+	cmp #0
+	bne @go_on
+		jsr draw_current_nametable_row
+	@go_on:
+	jsr do_sprite0
+	
 	jmp main_loop
 	
 show_level: 
 	jsr disable_all
 	jsr vblank_wait
+	
+	; Turn off 32 bit adding for addresses to load rows.
+	lda ppuCtrlBuffer
+	and #%11111011
+	sta ppuCtrlBuffer
+	
 	jsr load_graphics_data
 	jsr load_level
 	jsr load_nametable
@@ -598,6 +933,13 @@ show_level:
 	lda #PLAYER_DIRECTION_RIGHT
 	sta playerDirection
 	jsr initialize_player_sprite
+	
+	; Turn on 32 bit adding for addresses to load rows, instead of columns.
+	lda ppuCtrlBuffer
+	ora #%00000100
+	sta ppuCtrlBuffer
+
+	
 	jmp main_loop
 	
 disable_all:
@@ -647,44 +989,15 @@ nmi:
 	lda	#$02		; set the high byte (02) of the RAM address 
 	sta	OAM_DMA		; start the transfer
 
-	
-	lda SPRITE_ZERO
-	cmp #SPRITE_ZERO_POSITION
-	bne @skip_sprite0
-	
-	; Sprite zero trickery.. set flags so we go right
-	lda PPU_STATUS
-	lda #$00
-	sta PPU_ADDR
-	sta PPU_ADDR
-	lda #0
-	sta PPU_SCROLL
-	sta PPU_SCROLL
-		
-	
-	@waitNotSprite0: ; flag off...
-		lda $2002
-		and #%01000000
-		bne @waitNotSprite0
-	@waitSprite0: ; flag on...
-		lda $2002
-		and #%01000000
-		beq @waitSprite0
-		
-	; Ensure we really got to the end of the scanline.
-	ldx #$10
-	@waitEndOfSprite:
-		dex
-		bne @waitEndOfSprite
-	
 	; Your regularly scheduled programming
+	lda PPU_STATUS
+
 	@skip_sprite0:
 	lda ppuCtrlBuffer
 	sta PPU_CTRL
 	lda ppuMaskBuffer
 	sta PPU_MASK
 
-	lda PPU_STATUS
 	store scrollX, PPU_SCROLL
 	store scrollY, PPU_SCROLL
 
