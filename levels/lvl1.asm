@@ -32,13 +32,18 @@ lvl1_compressed_ids:
 	; Padding to 16-wide to make math easier
 	; Consider this: What could we accomplish with 8 bytes? (1 less shift, 4xrows less bytes)
 	; Consider this too: How gross is the math to find a position with 12 vs 16? Is there caching we could do?
+	; What if we used these 4 bytes for sprites? 
+	; Would we lose the benefit of the compression if we had sprites included in rows?
 	.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63, 63, 63,  2, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63,  2, 63,  2, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	
-	.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 3, 0, 0, 0, 0, 0, 0
-	.byte 63, 63, 63, 63, 63, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
-	.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
+	;.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 3, 0, 0, 0, 0, 0, 0
+	;.byte 63, 63, 63, 63, 63, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
+	;.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
+	.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 67, 1, 1, 0, 0, 0, 0
+	.byte 63, 63, 63, 63, 63, 63,  1, 63, 63, 131, 1, 1, 0, 0, 0, 0
+	.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 195, 1, 1, 0, 0, 0, 0
 	
 	.byte $ff
 	

@@ -17,7 +17,7 @@
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
 ; $300-4ff: Unused
-; $500-53f: Screen buffer
+; $500-55f: Screen buffer
 ; $520-5ff: Unused.
 ; $600-7ff: World map data.
 	
@@ -57,6 +57,7 @@
 	SCREEN_1_DATA			= $600
 	SCREEN_2_DATA			= $700
 	NEXT_ROW_CACHE			= $500
+	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
 	SPRITE_DATA				= $200
 	SPRITE_ZERO				= $200
 	PLAYER_SPRITE			= $210
@@ -75,6 +76,9 @@
 	WINDOW_WIDTH_TILES		= 16
 	BOTTOM_HUD_TILE			= $c0
 	
+	BANK_SWITCH_ADDR = $8000
+	BANK_SPRITES_AND_LEVEL = 0
+	
 	
 	
 	SHOW_VERSION_STRING = 1
@@ -86,6 +90,7 @@
 		txs
 		stx $FFF2
 		jmp reset
+		
 .segment "VECTORS"
 	.addr nmi, resetstub, $0000
 
@@ -150,6 +155,9 @@ vblankwait3:
 	bit	$2002
 	bpl	vblankwait3
 	
+; Use first bank.
+lda BANK_SPRITES_AND_LEVEL
+sta BANK_SWITCH_ADDR
 	
 	
 jsr disable_all
@@ -205,7 +213,7 @@ load_graphics_data:
 	rts
 	
 load_level: 
-	
+	; TODO: Refactor to make this use the line loads in sequence?
 	lda #$0f
 	sta levelPosition
 	lda #0
@@ -304,6 +312,24 @@ load_level:
 	rts
 	
 load_nametable:
+	; FIXME: this should work. In theory. Maybe?
+	/*
+	ldx #0
+	stx levelPosition
+	
+	@loopdedo: 
+		txa
+		pha
+		jsr load_current_line
+		pla
+		tax
+		inc levelPosition
+		inx
+		cpx #16
+		bne @loopdedo
+	rts
+	*/
+	
 	set_ppu_addr $20c0
 	lda #<(SCREEN_1_DATA)
 	sta tempAddr
@@ -465,6 +491,13 @@ load_current_line:
 		lda (tempAddr), y
 		sta SCREEN_2_DATA, x
 		jsr draw_to_cache
+		iny
+		txa
+		clc
+		adc #16
+		tax
+		cpy #16
+		
 		bne @loop_r
 	rts
 	
@@ -472,6 +505,12 @@ load_current_line:
 		lda (tempAddr), y
 		sta SCREEN_1_DATA, x
 		jsr draw_to_cache
+		iny
+		txa
+		clc
+		adc #16
+		tax
+		cpy #16
 		bne @loop_l
 
 	rts
@@ -479,6 +518,9 @@ load_current_line:
 ; Draws the tile in a to the next 4 positions in NEXT_ROW_CACHE. 
 ; Very tightly coupled to load_current_line. Moved to reduce complexity.
 draw_to_cache: 
+	; strip attrs
+	sta temp3
+	and #%00111111
 	pha
 	sty temp0
 	tya
@@ -504,14 +546,79 @@ draw_to_cache:
 	clc
 	adc #$10
 	sta NEXT_ROW_CACHE, y
-	ldy temp0
-	iny
-	txa
+	
+	lda temp0
 	clc
-	adc #16
-	tax
-	cpy #16
+	adc #1 ; Increment by 1, as we want to start on the second row, since our status bar is 6 tiles high. We need to start on those last 2.
+	sta temp1
+	lsr
+	tay ; Index to fetch/put data.
+	
+	lda temp3
+	and #%11000000
+	sta temp3
+	
+	lda levelPosition
+	and #%00000001
+	cmp #0
+	beq @lvl_odd
+		; Level is even. We want left of the bytes
+		lda temp1
+		and #%00000001
+		cmp #0
+		bne @tilenum_odd
+			; Tile number is even. We want bit 0
+			asl temp3
+			rol temp3
+			rol temp3
+			
+			lda NEXT_ROW_ATTRS, y
+			and #%11111100
+			clc
+			adc temp3
+			sta NEXT_ROW_ATTRS, y
 
+			jmp @go
+		@tilenum_odd: 
+			; Tile number is odd. We want bit 4
+			lsr temp3
+			lsr temp3
+			
+			lda NEXT_ROW_ATTRS, y
+			and #%11001111
+			clc
+			adc temp3
+			sta NEXT_ROW_ATTRS, y
+
+			jmp @go
+	@lvl_odd: 
+		; Level is odd. We want the right of the bytes.
+		lda temp1
+		and #%00000001
+		cmp #0
+		bne @tilenum2_odd
+			; Tilenum is even. We want bit 2
+			.repeat 4
+				lsr temp3
+			.endrepeat
+			
+			lda NEXT_ROW_ATTRS, y
+			and #%11110011
+			clc
+			adc temp3
+			sta NEXT_ROW_ATTRS, y
+			jmp @go
+		@tilenum2_odd: 
+			; Tilenum is odd. We want bit 6
+			lda NEXT_ROW_ATTRS, y
+			and #%00111111
+			clc
+			adc temp3
+			sta NEXT_ROW_ATTRS, y
+
+	@go: 
+	ldy temp0
+	
 	rts
 	
 draw_current_nametable_row:
@@ -585,10 +692,47 @@ draw_current_nametable_row:
 		cpx #56 ; 64 - 8 rows for sprite 0 header stuff
 		bne @looper2
 
+	lda levelPosition
+	and #%00000001
+	bne @attrs
+	jmp @no_attrs
+		
+	@attrs: 
+		lda PPU_STATUS
+		lda nametableAddr+1
+		clc 
+		adc #3 ; put us at the start of the attr table
+		sta PPU_ADDR
+		sta tempAddr+1
+		lda temp5
+		and #%00001111 ; get our offset from the screen % 16
+		lsr ; Divide by 2 to line up with attrs.
+		clc
+		adc #$c8 ; start of nametable under status
+		sta PPU_ADDR
+		sta tempAddr
+		ldx #0
+		
+		.repeat 5
+			lda NEXT_ROW_ATTRS, x
+			sta PPU_DATA
+			
+			lda tempAddr+1
+			sta PPU_ADDR
+			lda tempAddr
+			adc #8 ; next ro
+			sta tempAddr
+			sta PPU_ADDR
+			
+			inx
+		.endrepeat
+		; Write one last time w/o the memory stuffs.
+		lda NEXT_ROW_ATTRS, x
+		sta PPU_DATA
+	@no_attrs: 
 		
 	reset_ppu_scrolling
 	
-	; FIXME: Also need to figure out how to attributes.
 	rts
 
 	
@@ -1011,6 +1155,9 @@ nmi:
 	rti
 	
 	.include "title.asm"
+	
+.segment "BANK0"
+
 	.include "levels/lvl1.asm"
 	
 default_chr:
