@@ -16,7 +16,8 @@
 ; $000-0ff: zp values
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
-; $300-4ff: Unused
+; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
+; $400-4ff: Unused
 ; $500-55f: Screen buffer
 ; $520-5ff: Unused.
 ; $600-7ff: World map data.
@@ -50,6 +51,7 @@
 	lastCtrlButtons:		.res 1
 	playerVelocity:			.res 1
 	playerDirection:		.res 1
+	famitoneScratch:		.res 3
 	
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
@@ -80,7 +82,35 @@
 	BANK_SPRITES_AND_LEVEL = 0
 	
 	
-	
+;;;;;;;;;;;;;;;;;;;;;;;
+; Sound Effect ids
+	SFX_COIN = 1
+	SFX_FLAP = 0
+
+;;;;;;;;;;;;;;;;;;;;;;;
+; Music
+	SONG_CRAPPY = 0
+
+;;;;;;;;;;;;;;;;;;;;;;;
+; Famitone Settings
+
+	FT_BASE_ADR			= $0300				;page in the RAM used for FT2 variables, should be $xx00
+	FT_TEMP				= famitoneScratch	;3 bytes in zeropage used by the library as a scratchpad
+	FT_DPCM_OFF			= $c000	;$c000..$ffc0, 64-byte steps
+	FT_SFX_STREAMS		= 4		;number of sound effects played at once, 1..4
+
+	FT_DPCM_ENABLE		= 0		;undefine to exclude all DMC code
+	FT_SFX_ENABLE		= 1		;undefine to exclude all sound effects code
+	FT_THREAD			= 1		;undefine if you are calling sound effects from the same thread as the sound update call
+
+	FT_PAL_SUPPORT		= 0		;undefine to exclude PAL support
+	FT_NTSC_SUPPORT		= 1		;undefine to exclude NTSC support
+	 
+	; HAAAAAX (Overrides something needed in famitone that isn't properly defined for ca65)
+	FT_PITCH_FIX = 0
+
+;;;;;;;;;;;;;;;;;;;;;;
+; Misc	
 	SHOW_VERSION_STRING = 1
 	
 .segment "STUB"
@@ -159,6 +189,14 @@ vblankwait3:
 lda BANK_SPRITES_AND_LEVEL
 sta BANK_SWITCH_ADDR
 	
+ldx #<(all_music)
+ldy #>(all_music)
+lda #1 ; play ntsc musics/sound.
+jsr FamiToneInit
+ldx #<(all_sfx)
+ldy #>(all_sfx)
+jsr FamiToneSfxInit
+
 	
 jsr disable_all
 lda	#%10001000	; enable NMI, sprites from pattern table 0,
@@ -1043,8 +1081,9 @@ do_sprite0:
 main_loop: 
 
 	jsr handle_main_input
-	jsr do_player_movement	
-	
+	jsr do_player_movement
+	jsr FamiToneUpdate
+
 	jsr vblank_wait
 	
 	; Not ideal to do this inside vblank...
@@ -1083,6 +1122,8 @@ show_level:
 	ora #%00000100
 	sta ppuCtrlBuffer
 
+	lda #0
+	jsr FamiToneMusicPlay
 	
 	jmp main_loop
 	
@@ -1157,7 +1198,15 @@ nmi:
 	.include "title.asm"
 	
 .segment "BANK0"
+	.include "sound/famitone2.s"
 
+all_music: 
+	.include "sound/music.s"
+
+all_sfx: 
+	.include "sound/sfx.s"
+	
+	
 	.include "levels/lvl1.asm"
 	
 default_chr:

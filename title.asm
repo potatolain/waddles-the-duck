@@ -68,6 +68,7 @@ show_title:
 	jsr load_title
 	
 	@loopa: 
+		jsr FamiToneUpdate
 		jsr read_controller
 		
 		; Check for start button...
@@ -82,4 +83,7 @@ show_title:
 		jsr vblank_wait
 		jmp @loopa
 	@game_time: 
+		lda #SFX_COIN
+		ldx #FT_SFX_CH0
+		jsr FamiToneSfxPlay
 		jmp show_level

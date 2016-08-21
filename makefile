@@ -15,6 +15,8 @@ MAIN_EMULATOR=tools/fceux/fceux
 DEBUG_EMULATOR=tools/nintendulatordx/nintendulator
 SPACE_CHECKER=tools/nessc/nessc
 CONFIG_FILE=$(ROOT_DIR)/ca65-utils/nesgame-chr.cfg
+TEXT2DATA=sound/text2data
+NSF2DATA=sound/nsf2data
 VERSION=0.1a
 
 ### USER EDITABLE STUFF ENDS HERE
@@ -25,7 +27,7 @@ BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Hacky magic to read a random line from our file of splash messages.
 SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt)
 
-# In theory, every part of this makefile should work on Linux/Mac OS. If you find issues, report em!
+# In theory, most of this makefile (save for the famitone utils, windows only...) should work on Linux/Mac OS. If you find issues, report em!
 ifeq ($(OS),Windows_NT)
 	BUILD_DATE=$(shell echo %DATE% %TIME:~0,5%)
 	UPLOADER=tools\uploader\upload.bat
@@ -34,7 +36,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants build 
+all: generate_constants generate_sound build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -44,6 +46,15 @@ generate_constants:
 	@echo .define 		VERSION 		"$(VERSION)" >> lib/project_constants.asm
 	@echo .define 		BUILD_DATE		"$(BUILD_DATE)" >> lib/project_constants.asm
 	@echo .define 		SPLASH_MESSAGE 	"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
+	
+generate_sound:
+# This sucks.
+ifeq ($(OS),Windows_NT)
+	$(TEXT2DATA) sound\music.txt -ca65
+	$(NSF2DATA) sound\sfx.nsf -ntsc -ca65
+else
+	echo Warning: sound conversion not available on non-windows systems.
+endif
 	
 build: 
 	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes ../main.asm
