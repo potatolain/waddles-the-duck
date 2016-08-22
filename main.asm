@@ -350,96 +350,24 @@ load_level:
 	rts
 	
 load_nametable:
-	; FIXME: this should work. In theory. Maybe?
-	/*
+	
 	ldx #0
 	stx levelPosition
+	stx screenScroll
 	
 	@loopdedo: 
 		txa
 		pha
 		jsr load_current_line
+		jsr draw_current_nametable_row
 		pla
 		tax
 		inc levelPosition
+		inc screenScroll
 		inx
 		cpx #16
 		bne @loopdedo
-	rts
-	*/
-	
-	set_ppu_addr $20c0
-	lda #<(SCREEN_1_DATA)
-	sta tempAddr
-	lda #>(SCREEN_1_DATA)
-	sta tempAddr+1
-	jsr vblank_wait
-	ldx #0
-	ldy #0
-	sty temp5
-	clc ; HAX: Don't want to clc during this thing repeatedly, so do it once to avoid an off-by-one error. (hopefully)
-	@outer_loop:
-		txa
-		.repeat 4
-			asl
-		.endrepeat
-		tay
-		sty temp1
-		stx temp0
-		ldx #0
-		@top_loop:
-			lda (tempAddr), y
-			asl
-			sta PPU_DATA
-			adc #1
-			sta PPU_DATA
-			
-			iny
-			inx
-			cpx #16
-			bne @top_loop
-			
-		ldx #0
-		ldy temp1
-			
-		@bottom_loop:
-			lda (tempAddr), y
-			asl 
-			adc #$10
-			sta PPU_DATA
-			adc #1
-			sta PPU_DATA
-			
-			iny
-			inx
-			cpx #16
-			bne @bottom_loop
-			
-		ldx temp0
-		inx
-		cpx #12
-		bne @outer_loop
-		
-	; FIXME: Replace this with real attr loading
-	set_ppu_addr $23c0
-	lda #0
-	ldy #0
-	@clear_attributes:
-		sta PPU_DATA
-		iny
-		cpy #$40
-		bne @clear_attributes
-		
-	; FIXME: Shouldn't really need to do this.
-	set_ppu_addr $27c0
-	lda #0
-	ldy #0
-	@clear_attributes2:
-		sta PPU_DATA
-		iny
-		cpy #$40
-		bne @clear_attributes2
-		
+				
 	rts
 	
 initialize_player_sprite: 
@@ -751,7 +679,7 @@ draw_current_nametable_row:
 		sta tempAddr
 		ldx #0
 		
-		.repeat 5
+		.repeat 6
 			lda NEXT_ROW_ATTRS, x
 			sta PPU_DATA
 			
@@ -1101,14 +1029,30 @@ show_level:
 	jsr disable_all
 	jsr vblank_wait
 	
-	; Turn off 32 bit adding for addresses to load rows.
+	; Turn off 32 bit adding for addresses initially.
 	lda ppuCtrlBuffer
 	and #%11111011
+	sta PPU_CTRL
 	sta ppuCtrlBuffer
 	
 	jsr load_graphics_data
 	jsr load_level
+
+	; Turn on 32 bit adding for addresses to load rows.
+	lda ppuCtrlBuffer
+	ora #%00000100
+	sta PPU_CTRL
+	sta ppuCtrlBuffer
+
 	jsr load_nametable
+
+	; Turn it back off for the hud
+
+	lda ppuCtrlBuffer
+	and #%11111011
+	sta PPU_CTRL
+	sta ppuCtrlBuffer
+
 	jsr show_hud
 	jsr enable_all
 	jsr load_sprite0
