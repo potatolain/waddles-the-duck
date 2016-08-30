@@ -1,4 +1,4 @@
-.define  		BUILD 			857  
+.define  		BUILD 			898  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Mon 08/22/2016 19:56" 
-.define 		SPLASH_MESSAGE 	"Smells oddly refreshing" 
+.define 		BUILD_DATE		"Tue 08/30/2016 17:26" 
+.define 		SPLASH_MESSAGE 	"Not an RPG" 

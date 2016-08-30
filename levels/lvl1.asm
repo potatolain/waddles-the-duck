@@ -34,22 +34,21 @@ lvl1_compressed_ids:
 	; Consider this too: How gross is the math to find a position with 12 vs 16? Is there caching we could do?
 	; What if we used these 4 bytes for sprites? 
 	; Would we lose the benefit of the compression if we had sprites included in rows?
+	; Teleport point details? y-pos, mapno, x, y?
 	.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63, 63, 63,  2, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63,  2, 63,  2, 63, 63, 3, 1, 1, 0, 0, 0, 0
 	
-	;.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 3, 0, 0, 0, 0, 0, 0
-	;.byte 63, 63, 63, 63, 63, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
-	;.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 3, 0, 0, 0, 0, 0, 0
 	.byte 63, 63, 63, 63, 63, 63, 63, 63, 63, 67, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63, 63, 63,  1, 63, 63, 131, 1, 1, 0, 0, 0, 0
 	.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 195, 1, 1, 0, 0, 0, 0
+	.byte 63, 63, 63, 63,  1, 63,  1, 63, 63, 63, 63, 63, 0, 0, 0, 0 ; fall down the hole?
 	
 	.byte $ff
 	
 lvl1_compressed: 
 	.byte 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0
-	.byte 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 4, 4, 0, 0, 0, 0
+	.byte 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 4, 4, 6, 6, 6, 6
 	.byte 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	.byte 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 	.byte 1, 2, 3, 4, 5, 0, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4

@@ -36,6 +36,8 @@
 	levelPosition: 			.res 1
 	levelPositionExact:		.res 1
 	levelPositionExactP1:	.res 1
+	tempLevelPosition:		.res 1
+	tempLevelPositionExact:	.res 2
 	screenScroll:			.res 1
 	levelScrollL:			.res 1
 	levelMemPosR:			.res 1
@@ -50,6 +52,8 @@
 	ctrlButtons:			.res 1
 	lastCtrlButtons:		.res 1
 	playerVelocity:			.res 1
+	playerYVelocity:		.res 1
+	flightTimer:			.res 1
 	playerDirection:		.res 1
 	famitoneScratch:		.res 3
 	
@@ -66,6 +70,9 @@
 	
 	PLAYER_VELOCITY_NORMAL 	= $01
 	PLAYER_VELOCITY_FAST	= $02
+	PLAYER_VELOCITY_FALLING	= $02
+	PLAYER_VELOCITY_JUMPING	= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
+	PLAYER_JUMP_TIME		= $10
 	PLAYER_DIRECTION_LEFT	= $3
 	PLAYER_DIRECTION_RIGHT	= $0
 	SPRITE_ZERO_POSITION	= $27
@@ -78,14 +85,20 @@
 	WINDOW_WIDTH_TILES		= 16
 	BOTTOM_HUD_TILE			= $c0
 	
-	BANK_SWITCH_ADDR = $8000
-	BANK_SPRITES_AND_LEVEL = 0
+	BANK_SWITCH_ADDR 		= $8000
+	BANK_SPRITES_AND_LEVEL	= 0
+	
+	LAST_WALKABLE_SPRITE	= 0
+	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
+	
+	SPRITE_OFFSCREEN 		= $ef
 	
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Sound Effect ids
 	SFX_COIN = 1
 	SFX_FLAP = 0
+	SFX_JUMP = 2
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -108,6 +121,10 @@
 	 
 	; HAAAAAX (Overrides something needed in famitone that isn't properly defined for ca65)
 	FT_PITCH_FIX = 0
+	
+;;;;;;;;;;;;;;;;;;;;;;
+; Our Sound Settings
+	SOUND_CHANNEL_PLAYER = FT_SFX_CH0
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
@@ -702,7 +719,44 @@ draw_current_nametable_row:
 	rts
 
 	
+do_player_vertical_movement:
+	; FIXME: Collision detection goes here.
+	
+
+	lda playerYVelocity
+	cmp #0
+	bne @carry_on
+		rts
+	@carry_on:
+		lda PLAYER_SPRITE
+		clc
+		adc playerYVelocity
+		cmp #SPRITE_OFFSCREEN
+		bcc @not_uhoh
+			jmp reset ; FIXME: Probably should have something else happen on death.
+		@not_uhoh:
+		sta PLAYER_SPRITE
+		sta PLAYER_SPRITE+12
+		
+		lda PLAYER_SPRITE+4
+		clc
+		adc playerYVelocity
+		sta PLAYER_SPRITE+4
+		sta PLAYER_SPRITE+16
+		
+		lda PLAYER_SPRITE+8
+		clc
+		adc playerYVelocity
+		sta PLAYER_SPRITE+8
+		sta PLAYER_SPRITE+20
+	rts
+	
 do_player_movement: 
+	lda playerVelocity
+	cmp #0
+	bne @carry_on
+		rts
+	@carry_on:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @move_right
@@ -712,33 +766,56 @@ do_player_movement:
 		lda levelPositionExact
 		sec
 		sbc temp0
-		sta levelPositionExact
-		sta levelPosition
+		sta tempLevelPositionExact
+		sta tempLevelPosition
 		
 		lda levelPositionExact+1
 		sbc #0
-		sta levelPositionExact+1
+		sta tempLevelPositionExact+1
 		sta temp0
 		jmp @after_move
 	@move_right: 
 		lda levelPositionExact
 		clc
 		adc playerVelocity
-		sta levelPositionExact
-		sta levelPosition
+		sta tempLevelPositionExact
+		sta tempLevelPosition
 		
 		lda levelPositionExact+1
 		adc #0
-		sta levelPositionExact+1
+		sta tempLevelPositionExact+1
 		sta temp0
 	@after_move:
 	
-	lda levelPositionExact+1
+	
 	.repeat 4
 		lsr temp0
-		ror levelPosition
+		ror tempLevelPosition
 	.endrepeat
+
+						
+	; Test collision here. (Used vars at this point: temp0, temp4, temp5. Available: temp1, temp2, temp3)
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_LEFT
+	bne @collision_right
+		; left
+		jmp @dont_stop
+	@collision_right: 
+		; right
 		
+		jmp @dont_stop
+	
+	@stop: 
+		lda #0
+		sta playerVelocity
+		rts
+	@dont_stop: 
+	
+	store tempLevelPosition, levelPosition
+	store tempLevelPositionExact, levelPositionExact
+	store tempLevelPositionExact+1, levelPositionExact+1
+	
+	
 	
 	lda levelPositionExact
 	and #%00001110
@@ -908,6 +985,7 @@ do_player_movement:
 		sta PLAYER_SPRITE+19
 		sta PLAYER_SPRITE+23
 	@dont_scroll: 
+	
 
 	rts
 	
@@ -954,7 +1032,38 @@ handle_main_input:
 		@doit_right: 
 		sta playerVelocity
 	@done_right:
-			
+	
+	lda ctrlButtons
+	and #CONTROLLER_A
+	beq @done_a
+		lda playerYVelocity
+		cmp #0
+		bne @done_a
+		lda flightTimer
+		cmp #0
+		bne @done_a
+		
+		lda #PLAYER_VELOCITY_JUMPING
+		sta playerYVelocity
+		lda #PLAYER_JUMP_TIME
+		sta flightTimer
+		
+		lda #SFX_JUMP
+		ldx #SOUND_CHANNEL_PLAYER
+		jsr FamiToneSfxPlay
+
+	@done_a:
+	
+	lda flightTimer
+	cmp #0
+	beq @no_yvelocity
+		cmp #1
+		bne @not_switch
+			store #PLAYER_VELOCITY_FALLING, playerYVelocity
+		@not_switch:
+		dec flightTimer
+	
+	@no_yvelocity:
 	rts
 	
 load_sprite0:
@@ -1009,6 +1118,7 @@ do_sprite0:
 main_loop: 
 
 	jsr handle_main_input
+	jsr do_player_vertical_movement
 	jsr do_player_movement
 	jsr FamiToneUpdate
 

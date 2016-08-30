@@ -48,7 +48,6 @@ generate_constants:
 	@echo .define 		SPLASH_MESSAGE 	"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
 	
 generate_sound:
-# This sucks.
 ifeq ($(OS),Windows_NT)
 	$(TEXT2DATA) sound\music.txt -ca65
 	$(NSF2DATA) sound\sfx.nsf -ntsc -ca65
@@ -75,6 +74,11 @@ debug: generate_constants build_debug nintendulator
 	
 prepare_cart:
 	$(SPLITTER) bin/main.nes
+ifeq ($(OS),Windows_NT)
+	cd bin && copy /b mainProgram.bin + mainProgram.bin cartridge.bin
+else
+	echo Warning: Catridge converstion not supported on non-windows systems. This should be easy; if you add it, please submit a PR!
+endif
 
 space_check:
 	$(SPACE_CHECKER) bin/main.nes
