@@ -11,3 +11,4 @@ tools/readnes3/*
 tools/uploader/*
 !tools/uploader/README.md
 *.o
+.vscode
