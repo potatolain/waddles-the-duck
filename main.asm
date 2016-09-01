@@ -67,6 +67,7 @@
 	SPRITE_DATA				= $200
 	SPRITE_ZERO				= $200
 	PLAYER_SPRITE			= $210
+	PLAYER_BOTTOM_SPRITE	= PLAYER_SPRITE+12
 	
 	PLAYER_VELOCITY_NORMAL 	= $01
 	PLAYER_VELOCITY_FAST	= $02
@@ -720,8 +721,53 @@ draw_current_nametable_row:
 
 	
 do_player_vertical_movement:
-	; FIXME: Collision detection goes here.
+	; FIXME: This is definitely off by a few tiles, as is scrolling. What do we do?
 	
+	; FIXME: What about when we're walking and want to fall? Still not working...
+	lda playerYVelocity
+	cmp #PLAYER_VELOCITY_JUMPING ; FIXME: What about jumping collisions?
+	beq @no_collision ; FIXME: This actually means we need to test +0, rather than +1
+	cmp #0
+	bne @not_0
+		store #PLAYER_VELOCITY_FALLING, playerYVelocity ; If you're not moving, assume falling until you are proven to be standing on something.
+	@not_0:
+	
+	lda PLAYER_BOTTOM_SPRITE ; +0 for y.
+	clc
+	adc #8 ; Get to bottom of sprite.
+	and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
+	sec
+	sbc #%00100000 ; Subtract 2 to make us below the header.
+	cmp #%11000000 
+	bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
+	clc
+	adc screenScroll
+	sta tempAddr ; Low byte of the address.
+	
+	lda screenScroll ; Add in the position in scroll to figure out which nametable and add x coord
+	cmp #16
+	bcc @right
+		lda tempAddr
+		sec
+		sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
+		sta tempAddr
+		; Left, so hi byte of memory address is...
+		store #>(SCREEN_1_DATA), tempAddr+1
+		jmp @ready_for_collision
+	@right: 
+		store #>(SCREEN_2_DATA), tempAddr+1
+	@ready_for_collision:
+	ldy #0
+	lda (tempAddr), y
+	and #%01111111 ; Hi bit is used to switch colors, so exclude it.
+	cmp #63 ; FIXME: This is really, really stupid.
+	beq @no_collision
+		store #0, playerYVelocity ; Collided. Stop movin.
+	@no_collision:
+	
+	; FIXME: Need to test both left and right.
+	
+	lda levelPosition ; x
 
 	lda playerYVelocity
 	cmp #0
@@ -1036,6 +1082,9 @@ handle_main_input:
 	lda ctrlButtons
 	and #CONTROLLER_A
 	beq @done_a
+		lda lastCtrlButtons
+		and #CONTROLLER_A
+		bne @done_a ; Don't jump if you already used this A press to jump.
 		lda playerYVelocity
 		cmp #0
 		bne @done_a
@@ -1054,6 +1103,7 @@ handle_main_input:
 
 	@done_a:
 	
+	; Extra jump logic...
 	lda flightTimer
 	cmp #0
 	beq @no_yvelocity
@@ -1061,6 +1111,12 @@ handle_main_input:
 		bne @not_switch
 			store #PLAYER_VELOCITY_FALLING, playerYVelocity
 		@not_switch:
+		lda ctrlButtons
+		and #CONTROLLER_A
+		bne @dont_start_fallin
+			store #PLAYER_VELOCITY_FALLING, playerYVelocity
+			store #1, flightTimer ; So we can leverage that dec flightTimer below instead of jumping around!
+		@dont_start_fallin: 
 		dec flightTimer
 	
 	@no_yvelocity:
