@@ -39,7 +39,7 @@
 	tempLevelPosition:		.res 1
 	tempLevelPositionExact:	.res 2
 	screenScroll:			.res 1
-	levelScrollL:			.res 1
+	playerIsInScrollMargin:	.res 1
 	levelMemPosR:			.res 1
 	frameCounter: 			.res 1
 	ppuCtrlBuffer:			.res 1
@@ -73,10 +73,12 @@
 	PLAYER_VELOCITY_FAST	= $02
 	PLAYER_VELOCITY_FALLING	= $02
 	PLAYER_VELOCITY_JUMPING	= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
+	PLAYER_JUMP_TIME_RUN	= $14
 	PLAYER_JUMP_TIME		= $10
 	PLAYER_DIRECTION_LEFT	= $3
 	PLAYER_DIRECTION_RIGHT	= $0
 	SPRITE_ZERO_POSITION	= $27
+	PLAYER_HEIGHT			= 24
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -277,8 +279,10 @@ load_level:
 	sta levelPositionExact+1
 	lda #0
 	sta temp1
-	lda #$fe
+	lda #$fe ; The position we want to scroll from is at the very edge of 1 screen of content... 16*16. I'm actually unsure why I added the 2 pixels of wiggle room here...
 	sta levelPositionExact
+	lda #0 
+	sta playerIsInScrollMargin
 	
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
@@ -369,6 +373,9 @@ load_level:
 	
 load_nametable:
 	
+	ldx #1
+	stx playerIsInScrollMargin
+
 	ldx #0
 	stx levelPosition
 	stx screenScroll
@@ -386,6 +393,7 @@ load_nametable:
 		cpx #16
 		bne @loopdedo
 				
+	store #0, playerIsInScrollMargin
 	rts
 	
 initialize_player_sprite: 
@@ -423,6 +431,11 @@ initialize_player_sprite:
 	rts
 
 load_current_line:
+	lda playerIsInScrollMargin
+	cmp #0
+	bne @doit
+		rts
+	@doit: 
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @right
@@ -721,41 +734,60 @@ draw_current_nametable_row:
 
 	
 do_player_vertical_movement:
-	; FIXME: This is definitely off by a few tiles, as is scrolling. What do we do?
+	; FIXME: This is definitely off by a few tiles. What do we do?
 	
-	; FIXME: What about when we're walking and want to fall? Still not working...
 	lda playerYVelocity
 	cmp #PLAYER_VELOCITY_JUMPING ; FIXME: What about jumping collisions?
-	beq @no_collision ; FIXME: This actually means we need to test +0, rather than +1
+	beq @collide_up 
 	cmp #0
-	bne @not_0
+	bne @collide_down
 		store #PLAYER_VELOCITY_FALLING, playerYVelocity ; If you're not moving, assume falling until you are proven to be standing on something.
-	@not_0:
+	@collide_down:
 	
-	lda PLAYER_BOTTOM_SPRITE ; +0 for y.
-	clc
-	adc #8 ; Get to bottom of sprite.
-	and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
-	sec
-	sbc #%00100000 ; Subtract 2 to make us below the header.
-	cmp #%11000000 
-	bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
-	clc
-	adc screenScroll
-	sta tempAddr ; Low byte of the address.
-	
-	lda screenScroll ; Add in the position in scroll to figure out which nametable and add x coord
-	cmp #16
-	bcc @right
-		lda tempAddr
+		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
+		clc
+		adc #8 ; Get to bottom of sprite.
+		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
 		sec
-		sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
-		sta tempAddr
-		; Left, so hi byte of memory address is...
-		store #>(SCREEN_1_DATA), tempAddr+1
-		jmp @ready_for_collision
-	@right: 
-		store #>(SCREEN_2_DATA), tempAddr+1
+		sbc #%00100000 ; Subtract 2 to make us below the header.
+		cmp #%11000000 
+		bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
+		jmp @collision_prep
+
+	@collide_up: 
+		lda PLAYER_BOTTOM_SPRITE
+		sec
+		sbc #PLAYER_HEIGHT-8 ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
+		and #%11110000 ; Drop all digits < 16 to align with 16
+		sec
+		sbc #%00100000 ; Lose two because of the header
+		cmp #%00000000 ; If you're in the header, go away. Kick your direction down.
+		bcs @collision_prep
+			store #0, playerYVelocity
+			jmp @no_collision
+		@collision_prep:
+		
+		; We have the x position in the accumulator in either case.. add the scroll position in and move on.
+		clc
+		adc screenScroll
+		sta tempAddr ; Low byte of the address.
+		
+		lda screenScroll ; Add in the position in scroll to figure out which nametable and add x coord
+		cmp #16
+		bcc @right
+			lda tempAddr
+			sec
+			sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
+			sta tempAddr
+			; Left, so hi byte of memory address is...
+			store #>(SCREEN_1_DATA), tempAddr+1
+			jmp @ready_for_collision
+		@right: 
+			store #>(SCREEN_2_DATA), tempAddr+1
+			jmp @ready_for_collision
+
+
+
 	@ready_for_collision:
 	ldy #0
 	lda (tempAddr), y
@@ -768,7 +800,6 @@ do_player_vertical_movement:
 	; FIXME: Need to test both left and right.
 	
 	lda levelPosition ; x
-
 	lda playerYVelocity
 	cmp #0
 	bne @carry_on
@@ -840,7 +871,7 @@ do_player_movement:
 	.endrepeat
 
 						
-	; Test collision here. (Used vars at this point: temp0, temp4, temp5. Available: temp1, temp2, temp3)
+	; Test collision here.
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @collision_right
@@ -854,6 +885,7 @@ do_player_movement:
 	@stop: 
 		lda #0
 		sta playerVelocity
+		; TODO: Do we need to reverse anything or otherwise make this okay to do? I think we've jmped otherwise? 
 		rts
 	@dont_stop: 
 	
@@ -862,7 +894,8 @@ do_player_movement:
 	store tempLevelPositionExact+1, levelPositionExact+1
 	
 	
-	
+	lda #0
+	sta playerIsInScrollMargin
 	lda levelPositionExact
 	and #%00001110
 	cmp #0
@@ -870,6 +903,8 @@ do_player_movement:
 	lda playerVelocity
 	cmp #0
 	beq @not_scrollin
+		lda #1
+		sta playerIsInScrollMargin
 		lda playerDirection
 		cmp #PLAYER_DIRECTION_LEFT
 		bne @right
@@ -934,8 +969,6 @@ do_player_movement:
 	
 	lda frameCounter
 	and #%00000011
-	cmp #1
-	bcs @no_flop
 	cmp #1
 	bcs @no_flop
 		lda #0
@@ -1030,6 +1063,10 @@ do_player_movement:
 		sta PLAYER_SPRITE+15
 		sta PLAYER_SPRITE+19
 		sta PLAYER_SPRITE+23
+		lda playerIsInScrollMargin
+		sec 
+		sbc playerVelocity ; Undo the move of our position on the screen... put us back where we belong.
+		sta playerIsInScrollMargin
 	@dont_scroll: 
 	
 
@@ -1094,7 +1131,16 @@ handle_main_input:
 		
 		lda #PLAYER_VELOCITY_JUMPING
 		sta playerYVelocity
-		lda #PLAYER_JUMP_TIME
+		lda playerVelocity
+		cmp #PLAYER_VELOCITY_FAST
+		beq @fast
+		cmp #256-PLAYER_VELOCITY_FAST
+		beq @fast
+			lda #PLAYER_JUMP_TIME
+			jmp @do_jump
+		@fast: 
+			lda #PLAYER_JUMP_TIME_RUN
+		@do_jump:
 		sta flightTimer
 		
 		lda #SFX_JUMP
