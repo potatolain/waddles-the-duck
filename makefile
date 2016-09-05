@@ -38,7 +38,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants generate_sound convert_levels build 
+all: generate_constants sound_files convert_levels build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -49,13 +49,22 @@ generate_constants:
 	@echo .define 		BUILD_DATE		"$(BUILD_DATE)" >> lib/project_constants.asm
 	@echo .define 		SPLASH_MESSAGE 	"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
 	
-generate_sound:
+sound_files: sound/music.s sound/sfx.s
+
+sound/music.s: sound/music.txt
 ifeq ($(OS),Windows_NT)
 	$(TEXT2DATA) sound\music.txt -ca65
+else
+	echo Warning: sound conversion not available on non-windows systems.
+endif
+
+sound/sfx.s: sound/sfx.nsf
+ifeq ($(OS),Windows_NT)
 	$(NSF2DATA) sound\sfx.nsf -ntsc -ca65
 else
 	echo Warning: sound conversion not available on non-windows systems.
 endif
+
 
 levels/processed/%.asm: levels/%.json
 	$(NODE) ./tools/level-converter $<
@@ -77,7 +86,7 @@ run: fceux
 nintendulator:
 	$(DEBUG_EMULATOR) bin/main.nes
 
-debug: generate_constants generate_sound convert_levels build_debug nintendulator
+debug: generate_constants sound_files convert_levels build_debug nintendulator
 	
 prepare_cart:
 	$(SPLITTER) bin/main.nes
