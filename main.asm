@@ -1320,7 +1320,7 @@ all_sfx:
 	.include "sound/sfx.s"
 	
 	
-	.include "levels/lvl1.asm"
+	.include "levels/processed/lvl1.asm"
 	
 default_chr:
 	.incbin "graphics/map_tiles.chr"

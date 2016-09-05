@@ -12,3 +12,5 @@ tools/uploader/*
 !tools/uploader/README.md
 *.o
 .vscode
+levels/processed/*
+!levels/processed/empty

@@ -1,4 +1,4 @@
-.define  		BUILD 			1033  
+.define  		BUILD 			1038  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Mon 09/05/2016  1:02" 
-.define 		SPLASH_MESSAGE 	"Not an RPG" 
+.define 		BUILD_DATE		"Mon 09/05/2016 17:01" 
+.define 		SPLASH_MESSAGE 	"Afraid of ducks " 

@@ -10,6 +10,7 @@
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 MAIN_COMPILER=cl65
+NODE=node
 SPLITTER=tools/readnes3/readnes3
 MAIN_EMULATOR=tools/fceux/fceux
 DEBUG_EMULATOR=tools/nintendulatordx/nintendulator
@@ -22,10 +23,11 @@ VERSION=0.1a
 ### USER EDITABLE STUFF ENDS HERE
 
 
+LEVELS=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %.asm, $(wildcard levels/*.json)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Hacky magic to read a random line from our file of splash messages.
-SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt)
+SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
 
 # In theory, most of this makefile (save for the famitone utils, windows only...) should work on Linux/Mac OS. If you find issues, report em!
 ifeq ($(OS),Windows_NT)
@@ -36,7 +38,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants generate_sound build 
+all: generate_constants generate_sound convert_levels build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -54,7 +56,12 @@ ifeq ($(OS),Windows_NT)
 else
 	echo Warning: sound conversion not available on non-windows systems.
 endif
-	
+
+levels/processed/%.asm: levels/%.json
+	$(NODE) ./tools/level-converter $<
+
+convert_levels: $(LEVELS)
+
 build: 
 	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes ../main.asm
 	
@@ -70,7 +77,7 @@ run: fceux
 nintendulator:
 	$(DEBUG_EMULATOR) bin/main.nes
 
-debug: generate_constants build_debug nintendulator
+debug: generate_constants generate_sound convert_levels build_debug nintendulator
 	
 prepare_cart:
 	$(SPLITTER) bin/main.nes
