@@ -40,6 +40,7 @@
 	tempLevelPositionExact:	.res 2
 	screenScroll:			.res 1
 	playerIsInScrollMargin:	.res 1
+	playerXPosOnScreen:		.res 1
 	levelMemPosR:			.res 1
 	frameCounter: 			.res 1
 	ppuCtrlBuffer:			.res 1
@@ -271,11 +272,9 @@ load_graphics_data:
 	rts
 	
 load_level: 
-	; TODO: Refactor to make this use the line loads in sequence?
 	lda #$0f
 	sta levelPosition
 	lda #0
-	sta screenScroll
 	sta levelPositionExact+1
 	lda #0
 	sta temp1
@@ -283,92 +282,20 @@ load_level:
 	sta levelPositionExact
 	lda #0 
 	sta playerIsInScrollMargin
+
+	lda #2
+	sta screenScroll
+
+	; We start you at $20, so your position should represent that.
+	lda #$20
+	sta playerXPosOnScreen
+
 	
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
 	sta nametableAddr
 	lda #$24
 	sta nametableAddr+1
-	
-	ldx #0
-	stx temp2
-	@loop:
-		lda lvl1_compressed, x
-		
-		cmp #$ff
-		beq @level_loaded
-		
-		sta tempAddr
-		lda #0
-		sta tempAddr+1
-		
-		.repeat 4
-			asl tempAddr
-			rol tempAddr+1
-		.endrepeat
-		
-		lda tempAddr
-		clc
-		adc #<(lvl1_compressed_ids)
-		sta tempAddr
-
-		lda tempAddr+1
-		adc #>(lvl1_compressed_ids)
-		sta tempAddr+1
-				
-		ldy #0
-		
-		; In this inner loop, x must be 1-16 to avoid starting lower on the level than expected in cases
-		; Where we load more than one screen at once. temp2 = x%16.
-		stx temp1
-		ldx temp2
-		cpx #16
-		bne @do_it
-		ldx #0
-		stx temp2
-		
-		@do_it:
-		lda temp5
-		cmp #0
-		beq @inner_loop_nametable_1
-		jmp @inner_loop_nametable_2
-		
-		@inner_loop_nametable_1:
-			lda (tempAddr), y
-			sta SCREEN_1_DATA, x
-			iny
-			txa
-			clc
-			adc #$10
-			tax
-			cpy #16
-			bne @inner_loop_nametable_1
-			jmp @done_it
-			
-		@inner_loop_nametable_2:
-			lda (tempAddr), y
-			sta SCREEN_2_DATA, x
-			iny
-			txa
-			clc
-			adc #$10
-			tax
-			cpy #16
-			bne @inner_loop_nametable_2
-
-		@done_it:
-		inc temp2
-		ldx temp1
-		inx
-		cpx #32
-		beq @level_loaded
-		cpx #16
-		bne @loop ; Switch to nametable 2 if we go over the first table's bytes.
-			lda #1
-			sta temp5
-		jmp @loop
-	
-	@level_loaded: 
 	rts
 	
 load_nametable:
@@ -378,7 +305,9 @@ load_nametable:
 
 	ldx #0
 	stx levelPosition
+	ldx #255
 	stx screenScroll
+	ldx #0
 	
 	@loopdedo: 
 		txa
@@ -736,6 +665,25 @@ draw_current_nametable_row:
 do_player_vertical_movement:
 	; FIXME: This is definitely off by a few tiles. What do we do?
 	
+	; Subtract screenScroll down to where the player actually is... we want distance from right, so subtract from 256=0
+	lda #0
+	sec 
+	sbc playerXPosOnScreen
+	;lda playerXPosOnScreen
+	;clc
+	;adc #8 ; force ourselves to round up.
+	.repeat 4
+		lsr ; Divide down to x16
+	.endrepeat
+	sta temp5
+	lda screenScroll
+	sec
+	sbc temp5 
+	and #%00011111 ; %32 effectively. Should wrap us.
+	sta temp5 ; temp5 is now the scroll pos of the target row.
+
+
+
 	lda playerYVelocity
 	cmp #PLAYER_VELOCITY_JUMPING ; FIXME: What about jumping collisions?
 	beq @collide_up 
@@ -765,28 +713,27 @@ do_player_vertical_movement:
 		bcs @collision_prep
 			store #0, playerYVelocity
 			jmp @no_collision
-		@collision_prep:
-		
-		; We have the x position in the accumulator in either case.. add the scroll position in and move on.
-		clc
-		adc screenScroll
-		sta tempAddr ; Low byte of the address.
-		
-		lda screenScroll ; Add in the position in scroll to figure out which nametable and add x coord
-		cmp #16
-		bcc @right
-			lda tempAddr
-			sec
-			sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
-			sta tempAddr
-			; Left, so hi byte of memory address is...
-			store #>(SCREEN_1_DATA), tempAddr+1
-			jmp @ready_for_collision
-		@right: 
-			store #>(SCREEN_2_DATA), tempAddr+1
-			jmp @ready_for_collision
+	
+	@collision_prep:
+	
+	; We have the y position in the accumulator in either case.. add the scroll position in and move on.
+	clc
+	adc temp5
+	sta tempAddr ; Low byte of the address.
 
-
+	lda temp5 ; Add in the position in scroll to figure out which nametable and add x coord
+	cmp #16
+	bcc @left
+		lda tempAddr
+		sec
+		sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
+		sta tempAddr
+		; Left, so hi byte of memory address is...
+		store #>(SCREEN_2_DATA), tempAddr+1
+		jmp @ready_for_collision
+	@left: 
+		store #>(SCREEN_1_DATA), tempAddr+1
+		jmp @ready_for_collision
 
 	@ready_for_collision:
 	ldy #0
@@ -850,6 +797,11 @@ do_player_movement:
 		sbc #0
 		sta tempLevelPositionExact+1
 		sta temp0
+
+		lda playerXPosOnScreen
+		sec
+		sbc temp0
+		sta playerXPosOnScreen 
 		jmp @after_move
 	@move_right: 
 		lda levelPositionExact
@@ -862,6 +814,11 @@ do_player_movement:
 		adc #0
 		sta tempLevelPositionExact+1
 		sta temp0
+
+		lda playerXPosOnScreen
+		clc
+		adc temp0
+		sta playerXPosOnScreen
 	@after_move:
 	
 	
@@ -1063,10 +1020,10 @@ do_player_movement:
 		sta PLAYER_SPRITE+15
 		sta PLAYER_SPRITE+19
 		sta PLAYER_SPRITE+23
-		lda playerIsInScrollMargin
+		lda playerXPosOnScreen
 		sec 
 		sbc playerVelocity ; Undo the move of our position on the screen... put us back where we belong.
-		sta playerIsInScrollMargin
+		sta playerXPosOnScreen
 	@dont_scroll: 
 	
 
