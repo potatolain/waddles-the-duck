@@ -1081,22 +1081,31 @@ do_player_movement:
 		
 	@continue:
 	
-	lda frameCounter
-	and #%00000011
-	cmp #1
-	bcs @no_flop
-		lda #0
-		jmp @after_flop
-	@no_flop:
+	lda playerVelocity
+	cmp #PLAYER_VELOCITY_FAST
+	bne @slow
+	cmp #256-PLAYER_VELOCITY_FAST
+	bne @slow
+
+		lda frameCounter
+		and #%000001000
+		lsr 
 		lsr
-		clc
-		adc #1
-	@after_flop:
+		lsr
+		jmp @do_anim
+	@slow: 
+		lda frameCounter
+		and #%00000100
+		lsr
+		lsr
+
+	@do_anim:
 	sta temp0
 	clc
 	; multiply by 3.
 	adc temp0
 	adc temp0
+	adc #3 ; Add 3 to skip the "standing still" tile.
 
 	adc playerDirection
 	sta PLAYER_SPRITE+1
@@ -1488,6 +1497,7 @@ default_sprite_chr:
 default_palettes: 
 	.byte $31,$06,$16,$1a,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29	
 default_sprite_palettes: ; Drawn at same time as above.
+	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
 
 	
