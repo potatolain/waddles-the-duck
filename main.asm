@@ -38,6 +38,7 @@
 	levelPositionExactP1:	.res 1
 	tempLevelPosition:		.res 1
 	tempLevelPositionExact:	.res 2
+	playerPosition:			.res 2
 	screenScroll:			.res 1
 	playerIsInScrollMargin:	.res 1
 	playerXPosOnScreen:		.res 1
@@ -77,12 +78,13 @@
 	PLAYER_VELOCITY_JUMPING		= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
 	PLAYER_JUMP_TIME_RUN		= $14
 	PLAYER_JUMP_TIME			= $10
-	PLAYER_DIRECTION_LEFT		= $3
+	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
 	SPRITE_ZERO_POSITION		= $27
-	PLAYER_HEIGHT				= 24
-	PLAYER_WIDTH				= 16
-	PLAYER_POSITION_FUDGE_TILES = 76
+	PLAYER_HEIGHT				= 16
+	PLAYER_WIDTH				= 24
+	PLAYER_POSITION_FUDGE_TILES = 84
+	PLAYER_POSITION_FUDGE_TILES_IN_TEMP = 72
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -329,35 +331,35 @@ load_nametable:
 	rts
 	
 initialize_player_sprite: 
-	store #$a7, PLAYER_SPRITE
+	store #$af, PLAYER_SPRITE
 	store #$0, PLAYER_SPRITE+1
 	store #$0, PLAYER_SPRITE+2
 	store #$20, PLAYER_SPRITE+3
 	
 	store #$af, PLAYER_SPRITE+4
-	store #$10, PLAYER_SPRITE+5
+	store #$1, PLAYER_SPRITE+5
 	store #$0, PLAYER_SPRITE+6
-	store #$20, PLAYER_SPRITE+7
+	store #$28, PLAYER_SPRITE+7
 	
-	store #$b7, PLAYER_SPRITE+8
-	store #$20, PLAYER_SPRITE+9
+	store #$af, PLAYER_SPRITE+8
+	store #$2, PLAYER_SPRITE+9
 	store #$0, PLAYER_SPRITE+10
-	store #$20, PLAYER_SPRITE+11
+	store #$30, PLAYER_SPRITE+11
 	
-	store #$a7, PLAYER_SPRITE+12
-	store #$01, PLAYER_SPRITE+13
+	store #$b7, PLAYER_SPRITE+12
+	store #$10, PLAYER_SPRITE+13
 	store #$0, PLAYER_SPRITE+14
-	store #$28, PLAYER_SPRITE+15
+	store #$20, PLAYER_SPRITE+15
 	
-	store #$af, PLAYER_SPRITE+16
+	store #$b7, PLAYER_SPRITE+16
 	store #$11, PLAYER_SPRITE+17
 	store #$0, PLAYER_SPRITE+18
 	store #$28, PLAYER_SPRITE+19
 	
 	store #$b7, PLAYER_SPRITE+20
-	store #$21, PLAYER_SPRITE+21 
+	store #$12, PLAYER_SPRITE+21 
 	store #$0, PLAYER_SPRITE+22
-	store #$28, PLAYER_SPRITE+23
+	store #$30, PLAYER_SPRITE+23
 	
 	
 	rts
@@ -664,10 +666,59 @@ draw_current_nametable_row:
 	
 	rts
 
+
+seed_temp_level_position_for_player:
+	lda levelPositionExact+1
+	sta playerPosition+1
+	lda levelPositionExact
+	sec
+	sbc playerXPosOnScreen
+	sta playerPosition
+	lda playerPosition+1
+	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
+
+	sta playerPosition+1
+
+	; TODO: This shouldn't really be necessary. Where does this offset come from?
+	lda playerPosition
+	sec
+	sbc #PLAYER_POSITION_FUDGE_TILES
+	sta playerPosition
+	sta temp2
+	lda playerPosition+1
+	sbc #0
+	sta playerPosition+1
+
+	rts
+
+seed_player_position_from_temp:
+	lda tempLevelPositionExact+1
+	sta playerPosition+1
+	lda tempLevelPositionExact
+	sec
+	sbc playerXPosOnScreen
+	sta playerPosition
+	lda playerPosition+1
+	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
+
+	sta playerPosition+1
+
+	; TODO: This shouldn't really be necessary, and it's shocking we need a different value than normal. Where does this offset come from?
+	lda playerPosition
+	sec
+	sbc #PLAYER_POSITION_FUDGE_TILES_IN_TEMP
+	sta playerPosition
+	sta temp2
+	lda playerPosition+1
+	sbc #0
+	sta playerPosition+1
+
+	rts
+
+
 ; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
 ; [temp2,temp1] should be the position you want to test on the map. (Full)
 ; temp4 and temp5 will be consumed.
-; temp3=0, no collision, else collision
 test_vertical_collision:
 	.repeat 4
 		lsr temp1
@@ -679,9 +730,6 @@ test_vertical_collision:
 	and #%00001111
 	sta temp5 ; temp5 might be the scroll pos of the target row.
 
-	lda #1
-	sta temp3
-
 	lda playerYVelocity
 	cmp #PLAYER_VELOCITY_JUMPING
 	beq @collide_up 
@@ -691,8 +739,9 @@ test_vertical_collision:
 	@collide_down:
 	
 		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
+		sec
+		sbc #8 ; Get to bottom of sprite.
 		clc
-		adc #8 ; Get to bottom of sprite.
 		adc playerYVelocity ; We need to know where the player *will* be, not where they are.
 		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
 		sec
@@ -706,7 +755,7 @@ test_vertical_collision:
 		clc
 		adc playerYVelocity
 		sec ; ignore carry, as if we rolled over that's ok. (Negative velocity)
-		sbc #PLAYER_HEIGHT-8 ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
+		sbc #PLAYER_HEIGHT ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
 		and #%11110000 ; Drop all digits < 16 to align with 16
 		sec
 		sbc #%00100000 ; Lose two because of the header
@@ -744,38 +793,92 @@ test_vertical_collision:
 
 	rts
 
+; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
+; [temp2,temp1] should be the position you want to test on the map. (Full)
+; temp4 and temp5 will be consumed.
+; temp3=0: top, 1: bottom
+test_horizontal_collision:
+	.repeat 4
+		lsr temp1
+		ror temp2
+	.endrepeat
+	lda temp2
+	and #%00011111
+	sta temp4
+	and #%00001111
+	sta temp5 ; temp5 might be the scroll pos of the target row.
+
+	lda temp3
+	cmp #1
+	beq @collide_up 
+
+	@collide_down:
+	
+		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
+		sec
+		sbc #8 ; Get to bottom of sprite.
+		clc
+		adc playerYVelocity ; We need to know where the player *will* be, not where they are.
+		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
+		sec
+		sbc #%00100000 ; Subtract 2 to make us below the header.
+		jmp @collision_prep
+
+	@collide_up: 
+		lda PLAYER_BOTTOM_SPRITE
+		clc
+		adc playerYVelocity
+		sec ; ignore carry, as if we rolled over that's ok. (Negative velocity)
+		sbc #PLAYER_HEIGHT ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
+		and #%11110000 ; Drop all digits < 16 to align with 16
+		sec
+		sbc #%00100000 ; Lose two because of the header
+
+
+	@collision_prep:
+	
+	; We have the y position in the accumulator in either case.. add the scroll position in and move on.
+	clc
+	adc temp5
+	sta tempAddr ; Low byte of the address.
+
+	lda temp4 ; Add in the position in scroll to figure out which nametable and add x coord
+	cmp #16
+	bcc @left
+		; Left, so hi byte of memory address is...
+		store #>(SCREEN_1_DATA), tempAddr+1
+		jmp @ready_for_collision
+	@left: 
+		store #>(SCREEN_2_DATA), tempAddr+1
+		; implied jmp @read_for_collision
+
+
+	@ready_for_collision:
+	ldy #0
+	lda (tempAddr), y
+	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
+	cmp #63 ; FIXME: This is really, really stupid.
+	beq @no_collision
+	cmp #0
+	beq @no_collision ; FIXME: If we're hitting blocks with 0, we must be hitting stuff before it has been loaded. That's bad.
+		store #0, playerVelocity ; Collided. Stop movin.
+	@no_collision:
+
+	rts
+
 do_player_vertical_movement:
+	jsr seed_temp_level_position_for_player
+	store playerPosition+1, temp1
+	store playerPosition, temp2
 
-	lda levelPositionExact+1
-	sta tempLevelPositionExact+1
-	lda levelPositionExact
-	sec
-	sbc playerXPosOnScreen
-	sta tempLevelPositionExact
-	lda tempLevelPositionExact+1
-	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
-
-	sta tempLevelPositionExact+1
-
-	; TODO: This shouldn't really be necessary. Where does this offset come from?
-	lda tempLevelPositionExact
-	sec
-	sbc #PLAYER_POSITION_FUDGE_TILES
-	sta tempLevelPositionExact
-	sta temp2
-	lda tempLevelPositionExact+1
-	sbc #0
-	sta tempLevelPositionExact+1
-	sta temp1
-
-	; Player's position is now in tempLevelPositionExact[2]. And in temp1/temp2.
+	; Player's position is now in playerPosition[2]. And in temp1/temp2.
 	jsr test_vertical_collision
 
-	lda tempLevelPositionExact
+	lda playerPosition
 	clc
 	adc #PLAYER_WIDTH
 	sta temp2
-	lda tempLevelPositionExact+1
+	lda playerPosition+1
 	adc #0
 	sta temp1
 
@@ -797,19 +900,16 @@ do_player_vertical_movement:
 			jmp reset ; FIXME: Probably should have something else happen on death.
 		@not_uhoh:
 		sta PLAYER_SPRITE
-		sta PLAYER_SPRITE+12
-		
-		lda PLAYER_SPRITE+4
-		clc
-		adc playerYVelocity
 		sta PLAYER_SPRITE+4
-		sta PLAYER_SPRITE+16
+		sta PLAYER_SPRITE+8
 		
-		lda PLAYER_SPRITE+8
+		lda PLAYER_SPRITE+12
 		clc
 		adc playerYVelocity
-		sta PLAYER_SPRITE+8
+		sta PLAYER_SPRITE+12
+		sta PLAYER_SPRITE+16
 		sta PLAYER_SPRITE+20
+		
 	rts
 	
 do_player_movement: 
@@ -856,6 +956,7 @@ do_player_movement:
 		sta tempPlayerXPosOnScreen
 	@after_move:
 	
+	jsr seed_player_position_from_temp
 	
 	.repeat 4
 		lsr temp0
@@ -863,15 +964,37 @@ do_player_movement:
 	.endrepeat
 
 						
-	; Test collision here.
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
-	bne @collision_right
-		; left
-		jmp @dont_stop
-	@collision_right: 
+	beq @collision_left
 		; right
-		
+		lda playerPosition
+		clc
+		adc #PLAYER_WIDTH
+		sta playerPosition
+		lda playerPosition+1
+		clc
+		adc #0
+		sta playerPosition+1
+		; Just fall through to right since we don't do anything.
+	@collision_left: 
+		; right
+	
+		store #0, temp3
+		store playerPosition+1, temp1
+		store playerPosition, temp2
+
+		jsr test_horizontal_collision
+
+		store #1, temp3
+		store playerPosition+1, temp1
+		store playerPosition, temp2	
+		jsr test_horizontal_collision
+
+		lda playerVelocity
+		cmp #0
+		beq @stop
+
 		jmp @dont_stop
 	
 	@stop: 
@@ -926,36 +1049,34 @@ do_player_movement:
 	clc
 	adc playerVelocity
 	sta PLAYER_SPRITE+3
-	sta PLAYER_SPRITE+7
-	sta PLAYER_SPRITE+11
+	sta PLAYER_SPRITE+15
 
 	clc
 	adc #8
-	sta PLAYER_SPRITE+15
+	sta PLAYER_SPRITE+7
 	sta PLAYER_SPRITE+19
+
+	clc
+	adc #8
+	sta PLAYER_SPRITE+11
 	sta PLAYER_SPRITE+23
 	
 	lda playerVelocity
 	cmp #0
 	bne @continue
 		lda playerDirection
-		asl
+		clc
 		sta PLAYER_SPRITE+1
-		clc
-		adc #$10
+		adc #1
 		sta PLAYER_SPRITE+5
-		clc 
-		adc #$10
+		adc #1
 		sta PLAYER_SPRITE+9
-		clc
+		adc #$0e ; $10 - the three sprites set here.
+		sta PLAYER_SPRITE+13
+		adc #1
+		sta PLAYER_SPRITE+17
 		adc #1
 		sta PLAYER_SPRITE+21
-		sec
-		sbc #$10
-		sta PLAYER_SPRITE+17
-		sec
-		sbc #$10
-		sta PLAYER_SPRITE+13
 		rts
 		
 	@continue:
@@ -970,27 +1091,25 @@ do_player_movement:
 		lsr
 		clc
 		adc #1
-	@after_flop: 
-	asl
+	@after_flop:
+	sta temp0
 	clc
+	; multiply by 3.
+	adc temp0
+	adc temp0
+
 	adc playerDirection
-	adc playerDirection ; Sprites are two wide, so double it.
 	sta PLAYER_SPRITE+1
-	clc
-	adc #$10
+	adc #1
 	sta PLAYER_SPRITE+5
-	clc
-	adc #$10
+	adc #1
 	sta PLAYER_SPRITE+9
-	clc
+	adc #$0e ; 10 - the three sprites set here.
+	sta PLAYER_SPRITE+13
+	adc #1
+	sta PLAYER_SPRITE+17
 	adc #1
 	sta PLAYER_SPRITE+21
-	sec
-	sbc #$10
-	sta PLAYER_SPRITE+17
-	sec
-	sbc #$10
-	sta PLAYER_SPRITE+13
 
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
@@ -1049,12 +1168,14 @@ do_player_movement:
 		sec
 		sbc playerVelocity
 		sta PLAYER_SPRITE+3
-		sta PLAYER_SPRITE+7
-		sta PLAYER_SPRITE+11
+		sta PLAYER_SPRITE+15
 		clc
 		adc #8
-		sta PLAYER_SPRITE+15
+		sta PLAYER_SPRITE+7
 		sta PLAYER_SPRITE+19
+		clc
+		adc #8
+		sta PLAYER_SPRITE+11
 		sta PLAYER_SPRITE+23
 		lda playerXPosOnScreen
 		sec 
@@ -1365,13 +1486,9 @@ default_sprite_chr:
 	.incbin "graphics/sprites.chr"
 	
 default_palettes: 
-	.byte $31,$06,$16,$1a,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
-	.byte $31,$06,$16,$1a,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
-	
-default_sprite_palettes:
-	; Palette 1 is turtle
-	.byte $30,$05,$09,$19,$30,$00,$10,$30,$30,$01,$21,$31,$30,$06,$16,$26
-	.byte $30,$05,$09,$19,$30,$00,$10,$30,$30,$01,$21,$31,$30,$06,$16,$26
+	.byte $31,$06,$16,$1a,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29	
+default_sprite_palettes: ; Drawn at same time as above.
+	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
 
 	
 .segment "CHUNK"
