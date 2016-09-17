@@ -41,6 +41,7 @@
 	screenScroll:			.res 1
 	playerIsInScrollMargin:	.res 1
 	playerXPosOnScreen:		.res 1
+	tempPlayerXPosOnScreen:	.res 1
 	levelMemPosR:			.res 1
 	frameCounter: 			.res 1
 	ppuCtrlBuffer:			.res 1
@@ -70,16 +71,18 @@
 	PLAYER_SPRITE			= $210
 	PLAYER_BOTTOM_SPRITE	= PLAYER_SPRITE+12
 	
-	PLAYER_VELOCITY_NORMAL 	= $01
-	PLAYER_VELOCITY_FAST	= $02
-	PLAYER_VELOCITY_FALLING	= $02
-	PLAYER_VELOCITY_JUMPING	= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
-	PLAYER_JUMP_TIME_RUN	= $14
-	PLAYER_JUMP_TIME		= $10
-	PLAYER_DIRECTION_LEFT	= $3
-	PLAYER_DIRECTION_RIGHT	= $0
-	SPRITE_ZERO_POSITION	= $27
-	PLAYER_HEIGHT			= 24
+	PLAYER_VELOCITY_NORMAL 		= $01
+	PLAYER_VELOCITY_FAST		= $02
+	PLAYER_VELOCITY_FALLING		= $02
+	PLAYER_VELOCITY_JUMPING		= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
+	PLAYER_JUMP_TIME_RUN		= $14
+	PLAYER_JUMP_TIME			= $10
+	PLAYER_DIRECTION_LEFT		= $3
+	PLAYER_DIRECTION_RIGHT		= $0
+	SPRITE_ZERO_POSITION		= $27
+	PLAYER_HEIGHT				= 24
+	PLAYER_WIDTH				= 16
+	PLAYER_POSITION_FUDGE_TILES = 76
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -661,31 +664,26 @@ draw_current_nametable_row:
 	
 	rts
 
-	
-do_player_vertical_movement:
-	; FIXME: This is definitely off by a few tiles. What do we do?
-	
-	; Subtract screenScroll down to where the player actually is... we want distance from right, so subtract from 256=0
-	lda #0
-	sec 
-	sbc playerXPosOnScreen
-	;lda playerXPosOnScreen
-	;clc
-	;adc #8 ; force ourselves to round up.
+; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
+; [temp2,temp1] should be the position you want to test on the map. (Full)
+; temp4 and temp5 will be consumed.
+; temp3=0, no collision, else collision
+test_vertical_collision:
 	.repeat 4
-		lsr ; Divide down to x16
+		lsr temp1
+		ror temp2
 	.endrepeat
-	sta temp5
-	lda screenScroll
-	sec
-	sbc temp5 
-	and #%00011111 ; %32 effectively. Should wrap us.
-	sta temp5 ; temp5 is now the scroll pos of the target row.
+	lda temp2
+	and #%00011111
+	sta temp4
+	and #%00001111
+	sta temp5 ; temp5 might be the scroll pos of the target row.
 
-
+	lda #1
+	sta temp3
 
 	lda playerYVelocity
-	cmp #PLAYER_VELOCITY_JUMPING ; FIXME: What about jumping collisions?
+	cmp #PLAYER_VELOCITY_JUMPING
 	beq @collide_up 
 	cmp #0
 	bne @collide_down
@@ -695,6 +693,7 @@ do_player_vertical_movement:
 		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
 		clc
 		adc #8 ; Get to bottom of sprite.
+		adc playerYVelocity ; We need to know where the player *will* be, not where they are.
 		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
 		sec
 		sbc #%00100000 ; Subtract 2 to make us below the header.
@@ -704,7 +703,9 @@ do_player_vertical_movement:
 
 	@collide_up: 
 		lda PLAYER_BOTTOM_SPRITE
-		sec
+		clc
+		adc playerYVelocity
+		sec ; ignore carry, as if we rolled over that's ok. (Negative velocity)
 		sbc #PLAYER_HEIGHT-8 ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
 		and #%11110000 ; Drop all digits < 16 to align with 16
 		sec
@@ -721,30 +722,66 @@ do_player_vertical_movement:
 	adc temp5
 	sta tempAddr ; Low byte of the address.
 
-	lda temp5 ; Add in the position in scroll to figure out which nametable and add x coord
+	lda temp4 ; Add in the position in scroll to figure out which nametable and add x coord
 	cmp #16
 	bcc @left
-		lda tempAddr
-		sec
-		sbc #16 ; Get ourselves onto the same wavelength - > 16 just tells us which nametable/mem area we want.
-		sta tempAddr
 		; Left, so hi byte of memory address is...
-		store #>(SCREEN_2_DATA), tempAddr+1
-		jmp @ready_for_collision
-	@left: 
 		store #>(SCREEN_1_DATA), tempAddr+1
 		jmp @ready_for_collision
+	@left: 
+		store #>(SCREEN_2_DATA), tempAddr+1
+		; implied jmp @read_for_collision
+
 
 	@ready_for_collision:
 	ldy #0
 	lda (tempAddr), y
-	and #%01111111 ; Hi bit is used to switch colors, so exclude it.
+	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
 	cmp #63 ; FIXME: This is really, really stupid.
 	beq @no_collision
 		store #0, playerYVelocity ; Collided. Stop movin.
 	@no_collision:
+
+	rts
+
+do_player_vertical_movement:
+
+	lda levelPositionExact+1
+	sta tempLevelPositionExact+1
+	lda levelPositionExact
+	sec
+	sbc playerXPosOnScreen
+	sta tempLevelPositionExact
+	lda tempLevelPositionExact+1
+	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
+
+	sta tempLevelPositionExact+1
+
+	; TODO: This shouldn't really be necessary. Where does this offset come from?
+	lda tempLevelPositionExact
+	sec
+	sbc #PLAYER_POSITION_FUDGE_TILES
+	sta tempLevelPositionExact
+	sta temp2
+	lda tempLevelPositionExact+1
+	sbc #0
+	sta tempLevelPositionExact+1
+	sta temp1
+
+	; Player's position is now in tempLevelPositionExact[2]. And in temp1/temp2.
+	jsr test_vertical_collision
+
+	lda tempLevelPositionExact
+	clc
+	adc #PLAYER_WIDTH
+	sta temp2
+	lda tempLevelPositionExact+1
+	adc #0
+	sta temp1
+
+	; We shifted you.. now repeat. 
+	jsr test_vertical_collision
 	
-	; FIXME: Need to test both left and right.
 	
 	lda levelPosition ; x
 	lda playerYVelocity
@@ -784,24 +821,22 @@ do_player_movement:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @move_right
-		lda playerVelocity
-		and #%00000011 ; get it down to a real speed; get rid of potential negation.
-		sta temp0
+
 		lda levelPositionExact
-		sec
-		sbc temp0
+		clc
+		adc playerVelocity ; Use negation here.
 		sta tempLevelPositionExact
 		sta tempLevelPosition
 		
 		lda levelPositionExact+1
-		sbc #0
+		sbc #0 ; Take advantage of the fact we now have carry set, unless we didn't roll over.
 		sta tempLevelPositionExact+1
 		sta temp0
 
 		lda playerXPosOnScreen
-		sec
-		sbc temp0
-		sta playerXPosOnScreen 
+		clc
+		adc playerVelocity
+		sta tempPlayerXPosOnScreen 
 		jmp @after_move
 	@move_right: 
 		lda levelPositionExact
@@ -817,8 +852,8 @@ do_player_movement:
 
 		lda playerXPosOnScreen
 		clc
-		adc temp0
-		sta playerXPosOnScreen
+		adc playerVelocity
+		sta tempPlayerXPosOnScreen
 	@after_move:
 	
 	
@@ -849,6 +884,7 @@ do_player_movement:
 	store tempLevelPosition, levelPosition
 	store tempLevelPositionExact, levelPositionExact
 	store tempLevelPositionExact+1, levelPositionExact+1
+	store tempPlayerXPosOnScreen, playerXPosOnScreen
 	
 	
 	lda #0
