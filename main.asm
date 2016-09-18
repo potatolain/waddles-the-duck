@@ -105,9 +105,13 @@
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Sound Effect ids
-	SFX_COIN = 1
-	SFX_FLAP = 0
-	SFX_JUMP = 2
+	SFX_COIN	= 1
+	SFX_FLAP	= 0
+	SFX_JUMP	= 2
+	SFX_DUCK 	= 3
+	SFX_CHIRP 	= 4
+	SFX_MENU	= 5
+	SFX_WARP	= 6
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
