@@ -928,7 +928,7 @@ do_player_movement:
 
 		lda levelPositionExact
 		clc
-		adc playerVelocity ; Use negation here.
+		adc playerVelocity ; Expected rollover
 		sta tempLevelPositionExact
 		sta tempLevelPosition
 		

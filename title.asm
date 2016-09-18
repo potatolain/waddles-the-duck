@@ -83,7 +83,7 @@ show_title:
 		jsr vblank_wait
 		jmp @loopa
 	@game_time: 
-		lda #SFX_COIN
+		lda #SFX_MENU
 		ldx #FT_SFX_CH0
 		jsr FamiToneSfxPlay
 		jmp show_level
