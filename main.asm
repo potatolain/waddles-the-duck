@@ -101,7 +101,7 @@
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
 	
 	SPRITE_OFFSCREEN 		= $ef
-	
+
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Sound Effect ids
@@ -1016,10 +1016,28 @@ do_player_movement:
 	
 	lda #0
 	sta playerIsInScrollMargin
-	lda levelPositionExact
-	and #%00001110
-	cmp #0
-	bne @not_scrollin
+
+	; TODO: If I aggressively start and stop running I can likely start skipping blocks still. Should we lock you to running/walking for a few frames? (If we do that right it might even feel more natural.)
+	lda playerVelocity
+	cmp #PLAYER_VELOCITY_FAST
+	beq @fast
+	cmp #256-PLAYER_VELOCITY_FAST
+	beq @fast
+		; slow; 1px per scanline
+		lda levelPositionExact
+		and #%00001111
+		cmp #0
+		bne @not_scrollin
+		jmp @scrollit
+	@fast: 
+		; fast; 2px per scanline
+		lda levelPositionExact
+		and #%00001110
+		cmp #0
+		bne @not_scrollin
+		; intentional fallthru.
+
+	@scrollit:
 	lda playerVelocity
 	cmp #0
 	beq @not_scrollin
@@ -1499,7 +1517,7 @@ default_sprite_chr:
 	.incbin "graphics/sprites.chr"
 	
 default_palettes: 
-	.byte $31,$06,$16,$1a,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29	
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$01,$21,$31,$31,$09,$19,$29	
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
