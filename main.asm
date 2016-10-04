@@ -20,51 +20,47 @@
 ; $400-4ff: Unused
 ; $500-55f: Screen buffer
 ; $520-5ff: Unused.
-; $600-7ff: World map data.
+; $600-6ff: Unused.
+; $700-7ff: World map data.
 	
 	
 .segment "ZEROPAGE"
 	; 6 "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
-	temp0: 					.res 1
-	temp1: 					.res 1
-	temp2:					.res 1
-	temp3: 					.res 1
-	temp4: 					.res 1
-	temp5:					.res 1
-	levelPosition: 			.res 1
-	levelPositionExact:		.res 1
-	levelPositionExactP1:	.res 1
-	tempLevelPosition:		.res 1
-	tempLevelPositionExact:	.res 2
-	playerPosition:			.res 2
-	screenScroll:			.res 1
-	playerIsInScrollMargin:	.res 1
-	playerXPosOnScreen:		.res 1
-	tempPlayerXPosOnScreen:	.res 1
-	levelMemPosR:			.res 1
-	frameCounter: 			.res 1
-	ppuCtrlBuffer:			.res 1
-	ppuMaskBuffer: 			.res 1
-	tempAddr: 				.res 2
-	levelAddr: 				.res 2
-	nametableAddr:			.res 2
-	scrollX:				.res 1
-	scrollY:				.res 1
-	ctrlButtons:			.res 1
-	lastCtrlButtons:		.res 1
-	playerVelocity:			.res 1
-	playerYVelocity:		.res 1
-	flightTimer:			.res 1
-	playerDirection:		.res 1
-	famitoneScratch:		.res 3
+	temp0: 						.res 1
+	temp1: 						.res 1
+	temp2:						.res 1
+	temp3: 						.res 1
+	temp4: 						.res 1
+	temp5:						.res 1
+	playerPosition:				.res 2
+	playerScreenPosition:		.res 1
+	tempPlayerPosition:			.res 2
+	tempPlayerScreenPosition:	.res 1
+	levelPosition:				.res 1
+	playerIsInScrollMargin:		.res 1
+	levelMemPosR:				.res 1
+	frameCounter: 				.res 1
+	ppuCtrlBuffer:				.res 1
+	ppuMaskBuffer: 				.res 1
+	tempAddr: 					.res 2
+	levelAddr: 					.res 2
+	nametableAddr:				.res 2
+	scrollX:					.res 1
+	scrollY:					.res 1
+	ctrlButtons:				.res 1
+	lastCtrlButtons:			.res 1
+	playerVelocity:				.res 1
+	playerYVelocity:			.res 1
+	flightTimer:				.res 1
+	playerDirection:			.res 1
+	famitoneScratch:			.res 3
 	
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
 	CHAR_SPACE				= $ff
-	SCREEN_1_DATA			= $600
-	SCREEN_2_DATA			= $700
+	SCREEN_DATA				= $700
 	NEXT_ROW_CACHE			= $500
 	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
 	SPRITE_DATA				= $200
@@ -83,12 +79,10 @@
 	SPRITE_ZERO_POSITION		= $27
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
-	PLAYER_POSITION_FUDGE_TILES = 84
-	PLAYER_POSITION_FUDGE_TILES_IN_TEMP = 72
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
-	MIN_LEFT_LEVEL_POSITION 		= $0f
+	MIN_LEFT_LEVEL_POSITION 		= $02
 	
 	WINDOW_WIDTH			= 32
 	WINDOW_WIDTH_TILES		= 16
@@ -281,25 +275,14 @@ load_graphics_data:
 	rts
 	
 load_level: 
-	lda #$0f
-	sta levelPosition
+	lda #$20
+	sta playerPosition
+	sta playerScreenPosition
 	lda #0
-	sta levelPositionExact+1
-	lda #0
-	sta temp1
-	lda #$fe ; The position we want to scroll from is at the very edge of 1 screen of content... 16*16. I'm actually unsure why I added the 2 pixels of wiggle room here...
-	sta levelPositionExact
+	sta playerPosition+1
 	lda #0 
 	sta playerIsInScrollMargin
 
-	lda #2
-	sta screenScroll
-
-	; We start you at $20, so your position should represent that.
-	lda #$20
-	sta playerXPosOnScreen
-
-	
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
 	sta nametableAddr
@@ -314,9 +297,6 @@ load_nametable:
 
 	ldx #0
 	stx levelPosition
-	ldx #255
-	stx screenScroll
-	ldx #0
 	
 	@loopdedo: 
 		txa
@@ -326,12 +306,10 @@ load_nametable:
 		pla
 		tax
 		inc levelPosition
-		inc screenScroll
 		inx
-		cpx #16
+		cpx #32
 		bne @loopdedo
 				
-	store #0, playerIsInScrollMargin
 	rts
 	
 initialize_player_sprite: 
@@ -368,35 +346,53 @@ initialize_player_sprite:
 	
 	rts
 
+seed_level_position_l:
+	lda tempPlayerPosition
+	sec
+	sbc tempPlayerScreenPosition
+	sta levelPosition
+	lda tempPlayerPosition+1
+	sbc #0
+	sta temp0
+
+
+	.repeat 4
+		lsr temp0
+		ror levelPosition
+	.endrepeat
+
+	rts
+
+seed_level_position_r:
+	; Doing a bit of funky science here... subtrating down to the beginning of this screen, 
+	; then pushing you an entire screen forward. A little bass-ackwards, but... quick and sane enough.
+	lda tempPlayerPosition
+	sec
+	sbc tempPlayerScreenPosition
+	sta levelPosition
+	lda tempPlayerPosition+1
+	sbc #0
+	clc
+	adc #1
+	sta temp0
+
+	.repeat 4
+		lsr temp0
+		ror levelPosition
+	.endrepeat
+
+	rts
+
+
+
 load_current_line:
 	lda playerIsInScrollMargin
 	cmp #0
 	bne @doit
 		rts
 	@doit: 
-	lda playerDirection
-	cmp #PLAYER_DIRECTION_LEFT
-	bne @right
-		lda levelPosition
-		sec
-		sbc #WINDOW_WIDTH_TILES+3
-		tay
-		lda screenScroll
-		clc
-		adc #16
-		sta temp4
-		cmp #32
-		bcs @go
-		sec
-		sbc #32
-		sta temp4
-		jmp @go
-	@right: 
-		ldy levelPosition
-		lda screenScroll 
-		sta temp4
-	@go:
-	
+	ldy levelPosition
+
 	lda #0
 	sta tempAddr+1
 	lda lvl1_compressed, y
@@ -412,19 +408,14 @@ load_current_line:
 	sta tempAddr+1
 	
 	ldy #0
-	ldx temp4
-	cpx #16
-	bcc @loop_l
+	lda levelPosition
+	and #%00001111
+	tax ; x is now the position to apply to screen. 0-15, loopinate.
 	
-	txa
-	sec
-	sbc #16
-	tax
-	
-	@loop_r:
+	@loop:
 	
 		lda (tempAddr), y
-		sta SCREEN_2_DATA, x
+		sta SCREEN_DATA, x
 		jsr draw_to_cache
 		iny
 		txa
@@ -433,21 +424,7 @@ load_current_line:
 		tax
 		cpy #16
 		
-		bne @loop_r
-	rts
-	
-	@loop_l:
-		lda (tempAddr), y
-		sta SCREEN_1_DATA, x
-		jsr draw_to_cache
-		iny
-		txa
-		clc
-		adc #16
-		tax
-		cpy #16
-		bne @loop_l
-
+		bne @loop
 	rts
 	
 ; Draws the tile in a to the next 4 positions in NEXT_ROW_CACHE. 
@@ -456,13 +433,26 @@ draw_to_cache:
 	; strip attrs
 	sta temp3
 	and #%00111111
-	pha
+	asl
+	sta temp1
 	sty temp0
+
 	tya
 	asl
 	tay
-	pla
+
+	; Bit of madness going on here... basically we need to multiply the upper nybble by 2 in order to get the row number. The lower one is correct.
+	lda temp1
+	and #%11110000
 	asl
+	pha
+	lda temp1
+	and #%00001111
+	sta temp1
+	pla
+	ora temp1
+	sta temp1
+	
 	sta NEXT_ROW_CACHE, y
 	clc
 	adc #$10
@@ -557,32 +547,16 @@ draw_to_cache:
 	rts
 	
 draw_current_nametable_row:
-	
-	lda playerDirection
-	cmp #PLAYER_DIRECTION_LEFT
-	bne @right
-		; left
-		lda levelPosition
-		sec
-		sbc #WINDOW_WIDTH_TILES+3
-		sta temp5
-		jmp @go
-	@right: 
-		lda levelPosition
-		sta temp5
-		jmp @go
-	
-	@go:
-	lda temp5
+	lda levelPosition
 	and #%00001111
-	sta temp1
+	sta temp5
 	asl ; x2 because we want nametable addr, not map addr
 	clc
 	adc #BOTTOM_HUD_TILE
 	sta nametableAddr
 	
 	; TODO: This feels kinda clumsy/inefficient. Is there a smarter way?
-	lda temp5
+	lda levelPosition
 	and #%00010000
 	lsr
 	lsr
@@ -640,7 +614,6 @@ draw_current_nametable_row:
 		sta PPU_ADDR
 		sta tempAddr+1
 		lda temp5
-		and #%00001111 ; get our offset from the screen % 16
 		lsr ; Divide by 2 to line up with attrs.
 		clc
 		adc #$c8 ; start of nametable under status
@@ -671,60 +644,14 @@ draw_current_nametable_row:
 	rts
 
 
-seed_temp_level_position_for_player:
-	lda levelPositionExact+1
-	sta playerPosition+1
-	lda levelPositionExact
-	sec
-	sbc playerXPosOnScreen
-	sta playerPosition
-	lda playerPosition+1
-	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
-
-	sta playerPosition+1
-
-	; TODO: This shouldn't really be necessary. Where does this offset come from?
-	lda playerPosition
-	sec
-	sbc #PLAYER_POSITION_FUDGE_TILES
-	sta playerPosition
-	sta temp2
-	lda playerPosition+1
-	sbc #0
-	sta playerPosition+1
-
-	rts
-
-seed_player_position_from_temp:
-	lda tempLevelPositionExact+1
-	sta playerPosition+1
-	lda tempLevelPositionExact
-	sec
-	sbc playerXPosOnScreen
-	sta playerPosition
-	lda playerPosition+1
-	sbc #1 ; Account for carry and increment by 1 Because we're looking at screen position, and we want the player's position, which is off by 1 screen + playerXPos.
-
-	sta playerPosition+1
-
-	; TODO: This shouldn't really be necessary, and it's shocking we need a different value than normal. Where does this offset come from?
-	lda playerPosition
-	sec
-	sbc #PLAYER_POSITION_FUDGE_TILES_IN_TEMP
-	sta playerPosition
-	sta temp2
-	lda playerPosition+1
-	sbc #0
-	sta playerPosition+1
-
-	rts
 
 
 ; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
 ; [temp2,temp1] should be the position you want to test on the map. (Full)
 ; temp4 and temp5 will be consumed.
 test_vertical_collision:
-	.repeat 4
+	rts ; FIXME: Collision needs to be rewritten.
+	/*.repeat 4
 		lsr temp1
 		ror temp2
 	.endrepeat
@@ -790,18 +717,20 @@ test_vertical_collision:
 	ldy #0
 	lda (tempAddr), y
 	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
-	cmp #63 ; FIXME: This is really, really stupid.
+	cmp #63 ; TODO: Need a smarter way to do this.
 	beq @no_collision
 		store #0, playerYVelocity ; Collided. Stop movin.
 	@no_collision:
 
-	rts
+	rts*/
 
 ; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
 ; [temp2,temp1] should be the position you want to test on the map. (Full)
 ; temp4 and temp5 will be consumed.
 ; temp3=0: top, 1: bottom
 test_horizontal_collision:
+	rts ; FIXME: Collision needs a rewrite.
+	/*
 	.repeat 4
 		lsr temp1
 		ror temp2
@@ -861,20 +790,19 @@ test_horizontal_collision:
 	ldy #0
 	lda (tempAddr), y
 	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
-	cmp #63 ; FIXME: This is really, really stupid.
+	cmp #63 ; FIXME: Need a good way to tell what is what.
 	beq @no_collision
 	cmp #0
-	beq @no_collision ; FIXME: If we're hitting blocks with 0, we must be hitting stuff before it has been loaded. That's bad.
+	beq @no_collision
 		store #0, playerVelocity ; Collided. Stop movin.
 	@no_collision:
 
-	rts
+	rts*/
 
 do_player_vertical_movement:
-	jsr seed_temp_level_position_for_player
 	store playerPosition+1, temp1
 	store playerPosition, temp2
-
+/*
 	; Player's position is now in playerPosition[2]. And in temp1/temp2.
 	jsr test_vertical_collision
 
@@ -888,9 +816,8 @@ do_player_vertical_movement:
 
 	; We shifted you.. now repeat. 
 	jsr test_vertical_collision
+	*/
 	
-	
-	lda levelPosition ; x
 	lda playerYVelocity
 	cmp #0
 	bne @carry_on
@@ -926,73 +853,61 @@ do_player_movement:
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @move_right
 
-		lda levelPositionExact
+		lda playerPosition
 		clc
 		adc playerVelocity ; Expected rollover
-		sta tempLevelPositionExact
-		sta tempLevelPosition
+		sta tempPlayerPosition
 		
-		lda levelPositionExact+1
+		lda playerPosition+1
 		sbc #0 ; Take advantage of the fact we now have carry set, unless we didn't roll over.
-		sta tempLevelPositionExact+1
+		sta tempPlayerPosition+1
 		sta temp0
 
-		lda playerXPosOnScreen
+		lda playerScreenPosition
+		sta tempPlayerScreenPosition
 		clc
 		adc playerVelocity
-		sta tempPlayerXPosOnScreen 
+		cmp #MIN_POSITION_LEFT_SCROLL
+		bcc @after_move
+		beq @after_move ; If we're >= scroll pos, don't update.
+		sta tempPlayerScreenPosition 
 		jmp @after_move
 	@move_right: 
-		lda levelPositionExact
+		lda playerPosition
 		clc
 		adc playerVelocity
-		sta tempLevelPositionExact
-		sta tempLevelPosition
+		sta tempPlayerPosition
 		
-		lda levelPositionExact+1
+		lda playerPosition+1
 		adc #0
-		sta tempLevelPositionExact+1
+		sta tempPlayerPosition+1
 		sta temp0
 
-		lda playerXPosOnScreen
+		lda playerScreenPosition
+		sta tempPlayerScreenPosition
 		clc
 		adc playerVelocity
-		sta tempPlayerXPosOnScreen
+		cmp #MIN_POSITION_RIGHT_SCROLL
+		bcs @after_move
+		beq @after_move ; Don't store if it we're not scrolling. 
+		sta tempPlayerScreenPosition
 	@after_move:
-	
-	jsr seed_player_position_from_temp
-	
-	.repeat 4
-		lsr temp0
-		ror tempLevelPosition
-	.endrepeat
 
-						
+	store #0, temp3
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	beq @collision_left
 		; right
-		lda playerPosition
-		clc
-		adc #PLAYER_WIDTH
-		sta playerPosition
-		lda playerPosition+1
-		clc
-		adc #0
-		sta playerPosition+1
-		; Just fall through to right since we don't do anything.
+		jsr seed_level_position_r
+		jmp @after_seed
 	@collision_left: 
 		; right
-	
-		store #0, temp3
-		store playerPosition+1, temp1
-		store playerPosition, temp2
-
+		jsr seed_level_position_l
+	@after_seed:
 		jsr test_horizontal_collision
 
 		store #1, temp3
-		store playerPosition+1, temp1
-		store playerPosition, temp2	
+
 		jsr test_horizontal_collision
 
 		lda playerVelocity
@@ -1002,36 +917,32 @@ do_player_movement:
 		jmp @dont_stop
 	
 	@stop: 
-		lda #0
-		sta playerVelocity
 		; TODO: Do we need to reverse anything or otherwise make this okay to do? I think we've jmped otherwise? 
 		rts
 	@dont_stop: 
 	
-	store tempLevelPosition, levelPosition
-	store tempLevelPositionExact, levelPositionExact
-	store tempLevelPositionExact+1, levelPositionExact+1
-	store tempPlayerXPosOnScreen, playerXPosOnScreen
-	
+	store tempPlayerPosition, playerPosition
+	store tempPlayerPosition+1, playerPosition+1
+	store tempPlayerScreenPosition, playerScreenPosition	
 	
 	lda #0
 	sta playerIsInScrollMargin
 
-	; TODO: If I aggressively start and stop running I can likely start skipping blocks still. Should we lock you to running/walking for a few frames? (If we do that right it might even feel more natural.)
+	; TODO: If I aggressively start and stop running I can likely start skipping blocks. Should we lock you to running/walking for a few frames? (If we do that right it might even feel more natural.)
 	lda playerVelocity
 	cmp #PLAYER_VELOCITY_FAST
 	beq @fast
 	cmp #256-PLAYER_VELOCITY_FAST
 	beq @fast
 		; slow; 1px per scanline
-		lda levelPositionExact
+		lda playerPosition
 		and #%00001111
 		cmp #0
 		bne @not_scrollin
 		jmp @scrollit
 	@fast: 
 		; fast; 2px per scanline
-		lda levelPositionExact
+		lda playerPosition
 		and #%00001110
 		cmp #0
 		bne @not_scrollin
@@ -1043,27 +954,6 @@ do_player_movement:
 	beq @not_scrollin
 		lda #1
 		sta playerIsInScrollMargin
-		lda playerDirection
-		cmp #PLAYER_DIRECTION_LEFT
-		bne @right
-			dec screenScroll
-			lda screenScroll
-			cmp #255
-			bne @nada
-				lda #31
-				sta screenScroll
-			@nada:
-
-			jmp @do_scrollin
-		@right: 
-			inc screenScroll
-			lda screenScroll
-			cmp #32
-			bne @nadab
-				lda #0
-				sta screenScroll
-			@nadab:
-		@do_scrollin:
 		jsr load_current_line
 	@not_scrollin:
 		
@@ -1093,7 +983,7 @@ do_player_movement:
 		sta PLAYER_SPRITE+5
 		adc #1
 		sta PLAYER_SPRITE+9
-		adc #$0e ; $10 - the three sprites set here.
+		adc #$0e ; $10 - the sprites set here.
 		sta PLAYER_SPRITE+13
 		adc #1
 		sta PLAYER_SPRITE+17
@@ -1145,14 +1035,21 @@ do_player_movement:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @not_left
+
 		lda PLAYER_SPRITE+3
 		cmp #MIN_POSITION_LEFT_SCROLL
-		bcs @dont_scroll
-		lda levelPosition
-		cmp #WINDOW_WIDTH_TILES+2 ; 1 to stretch PAST the window width, and 1 more to deal with bcc, rather than having a beq too.
-		bcc @dont_scroll
-		jmp @do_scroll_l
-	@not_left: 
+		bcc @maybe_do_scroll_l
+		jmp @dont_scroll
+		@maybe_do_scroll_l:
+			lda playerPosition+1
+			cmp #0
+			bne @do_scroll_l
+			lda playerPosition
+			cmp #MIN_POSITION_LEFT_SCROLL
+			bcs @do_scroll_l
+			jmp @dont_scroll
+
+	@not_left:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_RIGHT
 	bne @dont_scroll
@@ -1208,10 +1105,6 @@ do_player_movement:
 		adc #8
 		sta PLAYER_SPRITE+11
 		sta PLAYER_SPRITE+23
-		lda playerXPosOnScreen
-		sec 
-		sbc playerVelocity ; Undo the move of our position on the screen... put us back where we belong.
-		sta playerXPosOnScreen
 	@dont_scroll: 
 	
 
@@ -1229,9 +1122,13 @@ handle_main_input:
 		sta playerDirection
 		
 		; If you're at the start of the level, go away. Don't run past the end.
-		lda levelPosition
+		lda playerPosition+1
+		cmp #0
+		bne @continue_left
+		lda playerPosition
 		cmp #MIN_LEFT_LEVEL_POSITION
 		bcc @done_left
+		@continue_left:
 		
 		lda ctrlButtons
 		and #CONTROLLER_B
@@ -1372,10 +1269,22 @@ main_loop:
 	jsr vblank_wait
 	
 	; Not ideal to do this inside vblank...
+	; TODO: Factor in player speed -- 0 v 2 (Probably drawing stuff twice)
 	lda #%00001110
-	and levelPositionExact
+	and playerPosition
 	cmp #0
 	bne @go_on
+	lda playerVelocity
+	cmp #0
+	beq @go_on
+		lda playerDirection
+		cmp #PLAYER_DIRECTION_LEFT
+		bne @right
+			jsr seed_level_position_l
+			jmp @do_draw
+		@right: 
+			jsr seed_level_position_r
+		@do_draw:
 		jsr draw_current_nametable_row
 	@go_on:
 	jsr do_sprite0
@@ -1388,7 +1297,7 @@ show_level:
 	
 	; Turn off 32 bit adding for addresses initially.
 	lda ppuCtrlBuffer
-	and #%11111011
+	and #%11111000 ; set to nametable 0
 	sta PPU_CTRL
 	sta ppuCtrlBuffer
 	
@@ -1517,7 +1426,7 @@ default_sprite_chr:
 	.incbin "graphics/sprites.chr"
 	
 default_palettes: 
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$01,$21,$31,$31,$09,$19,$29	
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$29,$31,$09,$19,$29	
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
