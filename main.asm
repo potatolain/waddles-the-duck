@@ -380,6 +380,7 @@ seed_level_position_r:
 		lsr temp0
 		ror levelPosition
 	.endrepeat
+	inc levelPosition ; Jump up one row, to keep it off-screen.
 
 	rts
 

@@ -1,4 +1,4 @@
-.define  		BUILD 			1387  
+.define  		BUILD 			1389  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Tue 10/04/2016 17:50" 
-.define 		SPLASH_MESSAGE 	"Once starred a turtle " 
+.define 		BUILD_DATE		"Fri 10/07/2016 11:58" 
+.define 		SPLASH_MESSAGE 	"Line 1!                         Line 2! " 
