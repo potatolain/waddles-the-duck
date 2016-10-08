@@ -79,6 +79,7 @@
 	SPRITE_ZERO_POSITION		= $27
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
+	HEADER_PIXEL_OFFSET			= 48
 	
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -295,7 +296,7 @@ load_nametable:
 	ldx #1
 	stx playerIsInScrollMargin
 
-	ldx #0
+	ldx #16
 	stx levelPosition
 	
 	@loopdedo: 
@@ -309,36 +310,53 @@ load_nametable:
 		inx
 		cpx #32
 		bne @loopdedo
+
+	; Load the first half second, so we seed SCREEN_DATA with the right stuff, rather than overwriting it.
+	ldx #0
+	stx levelPosition
+	
+	@loopdedoodle: 
+		txa
+		pha
+		jsr load_current_line
+		jsr draw_current_nametable_row
+		pla
+		tax
+		inc levelPosition
+		inx
+		cpx #16
+		bne @loopdedoodle
+
 				
 	rts
 	
 initialize_player_sprite: 
-	store #$af, PLAYER_SPRITE
+	store #$8f, PLAYER_SPRITE
 	store #$0, PLAYER_SPRITE+1
 	store #$0, PLAYER_SPRITE+2
 	store #$20, PLAYER_SPRITE+3
 	
-	store #$af, PLAYER_SPRITE+4
+	store #$8f, PLAYER_SPRITE+4
 	store #$1, PLAYER_SPRITE+5
 	store #$0, PLAYER_SPRITE+6
 	store #$28, PLAYER_SPRITE+7
 	
-	store #$af, PLAYER_SPRITE+8
+	store #$8f, PLAYER_SPRITE+8
 	store #$2, PLAYER_SPRITE+9
 	store #$0, PLAYER_SPRITE+10
 	store #$30, PLAYER_SPRITE+11
 	
-	store #$b7, PLAYER_SPRITE+12
+	store #$97, PLAYER_SPRITE+12
 	store #$10, PLAYER_SPRITE+13
 	store #$0, PLAYER_SPRITE+14
 	store #$20, PLAYER_SPRITE+15
 	
-	store #$b7, PLAYER_SPRITE+16
+	store #$97, PLAYER_SPRITE+16
 	store #$11, PLAYER_SPRITE+17
 	store #$0, PLAYER_SPRITE+18
 	store #$28, PLAYER_SPRITE+19
 	
-	store #$b7, PLAYER_SPRITE+20
+	store #$97, PLAYER_SPRITE+20
 	store #$12, PLAYER_SPRITE+21 
 	store #$0, PLAYER_SPRITE+22
 	store #$30, PLAYER_SPRITE+23
@@ -651,159 +669,144 @@ draw_current_nametable_row:
 ; [temp2,temp1] should be the position you want to test on the map. (Full)
 ; temp4 and temp5 will be consumed.
 test_vertical_collision:
-	rts ; FIXME: Collision needs to be rewritten.
-	/*.repeat 4
+	.repeat 4
 		lsr temp1
 		ror temp2
 	.endrepeat
-	lda temp2
-	and #%00011111
-	sta temp4
-	and #%00001111
-	sta temp5 ; temp5 might be the scroll pos of the target row.
+	; temp2 is now the x position of the block in test.
+	lda #%00001111 ; We only want the position % 16, so we can find our spot.
+	and temp2
+	sta temp2
 
 	lda playerYVelocity
 	cmp #PLAYER_VELOCITY_JUMPING
-	beq @collide_up 
-	cmp #0
-	bne @collide_down
-		store #PLAYER_VELOCITY_FALLING, playerYVelocity ; If you're not moving, assume falling until you are proven to be standing on something.
-	@collide_down:
-	
-		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
-		sec
-		sbc #8 ; Get to bottom of sprite.
-		clc
-		adc playerYVelocity ; We need to know where the player *will* be, not where they are.
-		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
-		sec
-		sbc #%00100000 ; Subtract 2 to make us below the header.
-		cmp #%11000000 
-		bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
-		jmp @collision_prep
+	beq @going_up 
 
-	@collide_up: 
 		lda PLAYER_BOTTOM_SPRITE
 		clc
+		adc #7
+		clc
 		adc playerYVelocity
-		sec ; ignore carry, as if we rolled over that's ok. (Negative velocity)
-		sbc #PLAYER_HEIGHT ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
-		and #%11110000 ; Drop all digits < 16 to align with 16
 		sec
-		sbc #%00100000 ; Lose two because of the header
-		cmp #%00000000 ; If you're in the header, go away. Kick your direction down.
-		bcs @collision_prep
+		sbc #HEADER_PIXEL_OFFSET ; remove header
+
+		and #%11110000 ; Align with 16
+		cmp #%11000000 
+		bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
+
+		; a is now the y coord of the block. temp2 is now the x. 
+		; a is already multipied by 16, so we just need to combine it with temp2.
+		; Carry must be clear or we'd hit no collision, so skip clc
+		adc temp2
+		sta temp2 ; Temp2 is now our index off of the collision table to check.
+
+		tay
+		lda SCREEN_DATA, y
+		and #%00111111
+		cmp #0
+		beq @no_collision
 			store #0, playerYVelocity
 			jmp @no_collision
-	
-	@collision_prep:
-	
-	; We have the y position in the accumulator in either case.. add the scroll position in and move on.
-	clc
-	adc temp5
-	sta tempAddr ; Low byte of the address.
 
-	lda temp4 ; Add in the position in scroll to figure out which nametable and add x coord
-	cmp #16
-	bcc @left
-		; Left, so hi byte of memory address is...
-		store #>(SCREEN_1_DATA), tempAddr+1
-		jmp @ready_for_collision
-	@left: 
-		store #>(SCREEN_2_DATA), tempAddr+1
-		; implied jmp @read_for_collision
+	@going_up:
 
+		lda PLAYER_SPRITE
+		sec
+		sbc #HEADER_PIXEL_OFFSET ; remove header
+		clc
+		adc playerYVelocity
+		and #%11110000 ; Align with 16
+		; TODO: Header check... and do, something?
 
-	@ready_for_collision:
-	ldy #0
-	lda (tempAddr), y
-	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
-	cmp #63 ; TODO: Need a smarter way to do this.
-	beq @no_collision
-		store #0, playerYVelocity ; Collided. Stop movin.
+		; a is now the y coord of the block. temp2 is now the x.
+		; combine away.
+		clc
+		adc temp2
+		sta temp2
+
+		tay
+		lda SCREEN_DATA, y
+		and #%00111111
+		cmp #0
+		beq @no_collision
+			store #0, playerYVelocity
+			; jmp @no_collision ; Intentional fallthrough 
+
 	@no_collision:
 
-	rts*/
+	rts
 
 ; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
 ; [temp2,temp1] should be the position you want to test on the map. (Full)
 ; temp4 and temp5 will be consumed.
 ; temp3=0: top, 1: bottom
 test_horizontal_collision:
-	rts ; FIXME: Collision needs a rewrite.
-	/*
+
 	.repeat 4
 		lsr temp1
 		ror temp2
 	.endrepeat
-	lda temp2
-	and #%00011111
-	sta temp4
-	and #%00001111
-	sta temp5 ; temp5 might be the scroll pos of the target row.
+	lda #%00001111 ; We only want the position % 16 to find our x.
+	and temp2
+	sta temp2
+
 
 	lda temp3
 	cmp #1
-	beq @collide_up 
-
-	@collide_down:
-	
-		lda PLAYER_BOTTOM_SPRITE ; +0 for y.
-		sec
-		sbc #8 ; Get to bottom of sprite.
-		clc
-		adc playerYVelocity ; We need to know where the player *will* be, not where they are.
-		and #%11110000 ; Drop all digits < 16.. align with 16 (imagine / 16 (* 16))
-		sec
-		sbc #%00100000 ; Subtract 2 to make us below the header.
-		jmp @collision_prep
-
-	@collide_up: 
+	beq @collide_up
+		; collision bottom
 		lda PLAYER_BOTTOM_SPRITE
 		clc
-		adc playerYVelocity
-		sec ; ignore carry, as if we rolled over that's ok. (Negative velocity)
-		sbc #PLAYER_HEIGHT ; Lose the height of the sprite itself from the total player height. Other option is to add 8 to the position to find the bottom first. (That = silly)
-		and #%11110000 ; Drop all digits < 16 to align with 16
+		adc #7 ; bottom of sprite
 		sec
-		sbc #%00100000 ; Lose two because of the header
+		sbc #HEADER_PIXEL_OFFSET ; remove header
+		and #%11110000 ; Align with 16
 
+		clc
+		adc temp2
+		sta temp2
 
-	@collision_prep:
-	
-	; We have the y position in the accumulator in either case.. add the scroll position in and move on.
-	clc
-	adc temp5
-	sta tempAddr ; Low byte of the address.
+		tay
+		lda SCREEN_DATA, y
+		and #%00111111
+		cmp #0
+		beq @no_collision
+			store #0, playerVelocity
+		
 
-	lda temp4 ; Add in the position in scroll to figure out which nametable and add x coord
-	cmp #16
-	bcc @left
-		; Left, so hi byte of memory address is...
-		store #>(SCREEN_1_DATA), tempAddr+1
-		jmp @ready_for_collision
-	@left: 
-		store #>(SCREEN_2_DATA), tempAddr+1
-		; implied jmp @read_for_collision
+	@collide_up: 
+		; collision top
+		lda PLAYER_SPRITE ; Grab top of top sprite.
+		sec
+		sbc #HEADER_PIXEL_OFFSET ; remove header
 
+		and #%11110000 ; align with 16
 
-	@ready_for_collision:
-	ldy #0
-	lda (tempAddr), y
-	and #%00111111 ; Hi bits are used to switch colors, so exclude them.
-	cmp #63 ; FIXME: Need a good way to tell what is what.
-	beq @no_collision
-	cmp #0
-	beq @no_collision
-		store #0, playerVelocity ; Collided. Stop movin.
+		clc
+		adc temp2
+		sta temp2
+		
+		tay 
+		lda SCREEN_DATA, y
+		and #%00111111
+		cmp #0
+		beq @no_collision
+			store #0, playerVelocity
+
 	@no_collision:
 
-	rts*/
+	rts
 
 do_player_vertical_movement:
 	store playerPosition+1, temp1
 	store playerPosition, temp2
-/*
+
+	lda playerYVelocity
+	cmp #0
+	bne @non_zero
+		store #PLAYER_VELOCITY_FALLING, playerYVelocity
+	@non_zero:
+
 	; Player's position is now in playerPosition[2]. And in temp1/temp2.
 	jsr test_vertical_collision
 
@@ -817,7 +820,7 @@ do_player_vertical_movement:
 
 	; We shifted you.. now repeat. 
 	jsr test_vertical_collision
-	*/
+	
 	
 	lda playerYVelocity
 	cmp #0
@@ -853,7 +856,7 @@ do_player_movement:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @move_right
-
+		store #0, temp4
 		lda playerPosition
 		clc
 		adc playerVelocity ; Expected rollover
@@ -874,6 +877,7 @@ do_player_movement:
 		sta tempPlayerScreenPosition 
 		jmp @after_move
 	@move_right: 
+		store #PLAYER_WIDTH, temp4
 		lda playerPosition
 		clc
 		adc playerVelocity
@@ -905,9 +909,23 @@ do_player_movement:
 		; right
 		jsr seed_level_position_l
 	@after_seed:
+		lda tempPlayerPosition 
+		clc
+		adc temp4
+		sta temp2
+		lda tempPlayerPosition+1
+		adc #0
+		sta temp1
 		jsr test_horizontal_collision
 
 		store #1, temp3
+		lda tempPlayerPosition 
+		clc
+		adc temp4
+		sta temp2
+		lda tempPlayerPosition+1
+		adc #0
+		sta temp1
 
 		jsr test_horizontal_collision
 

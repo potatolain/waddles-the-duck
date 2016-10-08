@@ -1,4 +1,4 @@
-.define  		BUILD 			1389  
+.define  		BUILD 			1465  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Fri 10/07/2016 11:58" 
-.define 		SPLASH_MESSAGE 	"Line 1!                         Line 2! " 
+.define 		BUILD_DATE		"Fri 10/07/2016 22:56" 
+.define 		SPLASH_MESSAGE 	"Artistically challenged " 
