@@ -56,11 +56,13 @@
 	flightTimer:				.res 1
 	playerDirection:			.res 1
 	famitoneScratch:			.res 3
+	currentDimension:			.res 1
+	currentPalette:				.res 1
 	
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
 	CHAR_SPACE				= $ff
-	SCREEN_DATA				= $700
+	SCREEN_DATA				= $600
 	NEXT_ROW_CACHE			= $500
 	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
 	SPRITE_DATA				= $200
@@ -80,6 +82,8 @@
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
 	HEADER_PIXEL_OFFSET			= 48
+
+	DIMENSIONAL_SWAP_TIME		= 64
 
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
@@ -106,7 +110,7 @@
 	SFX_DUCK 	= 3
 	SFX_CHIRP 	= 4
 	SFX_MENU	= 5
-	SFX_WARP	= 6
+	SFX_WARP	= 7
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -238,8 +242,17 @@ load_graphics_data:
 		lda default_palettes, y
 		sta PPU_DATA
 		iny
-		cpy #$20
+		cpy #$10
 		bne @palette_loop
+
+	set_ppu_addr $3f10
+	ldy #0
+	@palette_loop_b:
+		lda default_sprite_palettes, y
+		sta PPU_DATA
+		iny
+		cpy #$10
+		bne @palette_loop_b
 
 	store #<(default_chr), tempAddr
 	store #>(default_chr), tempAddr+1
@@ -1227,6 +1240,13 @@ handle_main_input:
 		dec flightTimer
 	
 	@no_yvelocity:
+
+	lda ctrlButtons
+	and #CONTROLLER_SELECT
+	beq @done_sel
+		jsr do_dimensional_transfer
+	@done_sel:
+
 	rts
 	
 load_sprite0:
@@ -1276,6 +1296,162 @@ do_sprite0:
 	sta PPU_CTRL
 	@skip_sprite0:
 	reset_ppu_scrolling
+	rts
+
+; Child of do_dimensional_transfer - does the actual fading to decrease code dupe.
+do_fade_anim: 
+	lda currentPalette
+	asl
+	asl ; multiply by 16 to get position off original number.
+	asl
+	asl
+	tax ; x is now the index of the palette-y thing
+
+	jsr vblank_wait
+	lda PPU_STATUS
+	set_ppu_addr $3f00
+
+	ldy #16
+	@inner_loop:
+		lda default_palettes, x
+		sec
+		sbc temp0
+		bcs :+
+			lda #$0f ; if you went over carry, fade to black early.
+		: ; No-name skip label because if we put a named label in a loop, it'll freak!
+		sta PPU_DATA
+		dey
+		inx
+
+		cpy #0
+		bne @inner_loop
+	
+	; ppu addr is correct from above; no need to reset.
+	ldy #16
+	txa
+	sec
+	sbc #16
+	tax
+	@inner_loop_sprites:
+		lda default_sprite_palettes, x
+		sec
+		sbc temp0
+		bcs :+
+			lda #$0f ; if you went over carry, fade to black early.
+		: ; No-name skip label because if we put a named label in a loop, it'll freak!
+		sta PPU_DATA
+		dey
+		inx
+
+		cpy #0
+		bne @inner_loop_sprites
+	rts
+
+; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
+do_dimensional_transfer:
+
+	lda #SFX_WARP
+	ldx #SOUND_CHANNEL_PLAYER
+	jsr FamiToneSfxPlay
+	jsr FamiToneMusicPause ; A should be non-zero here, causing a pause.
+
+
+	lda ppuCtrlBuffer
+	sta temp4
+	and #%11111011
+	sta ppuCtrlBuffer ; Reset to going sequentially rather than incrementing by 32
+	jsr vblank_wait
+
+	
+	; TODO: Lots of hard coded numbers here... numbers are kinda necessary but I'm wondering if there's math I could pull off.
+	; For now, assumes 0 < x <=64
+	ldx #0
+
+	@loopah: 
+		cpx #16
+		bcs @increase_maybe
+			; decreasing palette.
+			txa
+			pha ; Shove it into the stack so we can get it back.
+			lsr
+			lsr ; Now between 0-3 decreasing
+			asl
+			asl
+			asl
+			asl ; Now a multiple of 16
+			sta temp0
+
+			jsr do_fade_anim
+
+			pla
+			tax ; x is back.
+
+			jmp @end_loop
+			
+
+
+		@increase_maybe:
+		cpx #17 ; at 17, wipe everything out, since our fade method is kind of flawed/imperfect and doesn't always 0 everything out.
+		bne @increase_maybe2
+			jsr vblank_wait
+			lda PPU_STATUS
+			set_ppu_addr $3f00
+
+			ldy #32
+			@wiper_loop_decrease:
+				lda #$0f
+				sta PPU_DATA
+				dey
+
+				cpy #0
+				bne @wiper_loop_decrease
+			jmp @end_loop
+		@increase_maybe2:
+		cpx #48
+			; This is where we turn things off and do our tile swaps, switch to a different palette, change the dimension, etc. The world is your lobster. (yes, lobster)
+		bcs @increase
+		@increase:
+
+			; decreasing palette.
+			txa
+			pha ; Shove it into the stack so we can get it back.
+			sec
+			sbc #48 ; Get it down to 0-15
+			sta temp0
+			lda #16
+			sbc temp0 ; and now it's inverted.
+			lsr
+			lsr ; Now between 0-3 decreasing
+			asl
+			asl
+			asl
+			asl ; Now a multiple of 16
+			sta temp0
+
+			jsr do_fade_anim
+
+			pla
+			tax ; x is back.
+
+		@end_loop:
+			txa
+			pha
+			reset_ppu_scrolling
+			jsr do_sprite0
+			jsr FamiToneUpdate; We're our own little thing.. need to trigger famitone.
+			pla
+			tax 
+			inx
+			cpx #DIMENSIONAL_SWAP_TIME
+			beq @done_d
+				jmp @loopah; You will stay here FOR-EV-ER!!
+			@done_d:
+	@done:
+	jsr vblank_wait
+	lda temp4
+	sta ppuCtrlBuffer
+	lda #0 ; 0 = play.
+	jsr FamiToneMusicPause
 	rts
 	
 main_loop: 
@@ -1406,7 +1582,6 @@ nmi:
 	; Your regularly scheduled programming
 	lda PPU_STATUS
 
-	@skip_sprite0:
 	lda ppuCtrlBuffer
 	sta PPU_CTRL
 	lda ppuMaskBuffer
