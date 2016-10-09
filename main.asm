@@ -80,7 +80,7 @@
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
 	HEADER_PIXEL_OFFSET			= 48
-	
+
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
 	MIN_LEFT_LEVEL_POSITION 		= $02
@@ -324,7 +324,7 @@ load_nametable:
 		tax
 		inc levelPosition
 		inx
-		cpx #16
+		cpx #17 ; We start the level offset by one to help with scrolling. If we don't do this, we'll skip the first tile of the second screen.
 		bne @loopdedoodle
 
 				
