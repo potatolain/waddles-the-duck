@@ -85,6 +85,19 @@
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
+;;;;;;;;;;;;;;;;;;;;;;;
+; Dimension definitions
+;   Also masks for choosing which palettes to use.
+
+	DIMENSION_MASK				= %11100000
+	DIMENSION_PLAIN				= %00000000
+	DIMENSION_CALM				= %01000000
+	DIMENSION_ICE_AGE			= %10100000
+	DIMENSION_AGGRESSIVE		= %00100000
+	DIMENSION_AUTUMN			= %01100000
+	DIMENSION_EVIL				= %11100000
+
+
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
 	MIN_LEFT_LEVEL_POSITION 		= $02
@@ -1287,10 +1300,14 @@ do_sprite0:
 		beq @waitSprite0
 		
 	; Ensure we really got to the end of the scanline.
+	txa
+	pha
 	ldx #$10
 	@waitEndOfSprite:
 		dex
 		bne @waitEndOfSprite
+	pla
+	tax
 	lda PPU_STATUS
 	lda ppuCtrlBuffer
 	sta PPU_CTRL
@@ -1380,8 +1397,9 @@ do_dimensional_transfer:
 			asl
 			asl ; Now a multiple of 16
 			sta temp0
-
+			
 			jsr do_fade_anim
+			jsr do_sprite0
 
 			pla
 			tax ; x is back.
@@ -1405,11 +1423,35 @@ do_dimensional_transfer:
 
 				cpy #0
 				bne @wiper_loop_decrease
+				jsr do_sprite0
 			jmp @end_loop
 		@increase_maybe2:
 		cpx #48
-			; This is where we turn things off and do our tile swaps, switch to a different palette, change the dimension, etc. The world is your lobster. (yes, lobster)
 		bcs @increase
+
+			; This is where we turn things off and do our tile swaps, switch to a different palette, change the dimension, etc. The world is your lobster. (yes, lobster)
+			; TODO: Probably need this passed in. temp5 is unused, or we could define one just for this. 
+			jsr vblank_wait
+			jsr do_sprite0
+			lda currentDimension
+			cmp #DIMENSION_ICE_AGE
+			bne @not_ice_age
+				; it's an ice age; go back to normal.
+				lda #DIMENSION_PLAIN
+				jmp @after_swap
+			@not_ice_age:
+				lda #DIMENSION_ICE_AGE
+			@after_swap:
+			sta currentDimension
+
+			lda ppuMaskBuffer
+			and #DIMENSION_MASK^255
+			ora currentDimension
+			sta ppuMaskBuffer
+			;ldx #48
+			jmp @end_loop
+
+
 		@increase:
 
 			; decreasing palette.
@@ -1427,8 +1469,8 @@ do_dimensional_transfer:
 			asl
 			asl ; Now a multiple of 16
 			sta temp0
-
 			jsr do_fade_anim
+			jsr do_sprite0
 
 			pla
 			tax ; x is back.
@@ -1437,7 +1479,7 @@ do_dimensional_transfer:
 			txa
 			pha
 			reset_ppu_scrolling
-			jsr do_sprite0
+			;jsr do_sprite0
 			jsr FamiToneUpdate; We're our own little thing.. need to trigger famitone.
 			pla
 			tax 
@@ -1448,6 +1490,7 @@ do_dimensional_transfer:
 			@done_d:
 	@done:
 	jsr vblank_wait
+	jsr do_sprite0
 	lda temp4
 	sta ppuCtrlBuffer
 	lda #0 ; 0 = play.
@@ -1545,6 +1588,7 @@ disable_all_immediate:
 
 enable_all:
 	lda	#%00011110	; enable sprites, enable background,
+	ora currentDimension
 	sta	ppuMaskBuffer	;  no clipping on left
 	; If you're running this, we have to assume you are not currently running... so skip the buffer.
 	sta PPU_MASK
