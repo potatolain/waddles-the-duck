@@ -58,6 +58,9 @@
 	famitoneScratch:			.res 3
 	currentDimension:			.res 1
 	currentPalette:				.res 1
+	warpDimensionA:				.res 1
+	warpDimensionB:				.res 1
+	warpIntersectY:				.res 1
 	
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
@@ -95,7 +98,8 @@
 	DIMENSION_ICE_AGE			= %11000000
 	DIMENSION_AGGRESSIVE		= %00100000
 	DIMENSION_AUTUMN			= %01100000
-	DIMENSION_EVIL				= %11100000
+	DIMENSION_FADE				= %11100000
+	DIMENSION_INVALID			= %00011111
 
 
 	MIN_POSITION_LEFT_SCROLL		= $40
@@ -127,7 +131,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
-	SONG_CRAPPY = 0
+	SONG_CRAPPY 		= 0
+	SONG_ICE_CRAPPY 	= 1
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -309,6 +314,10 @@ load_level:
 	sta playerPosition+1
 	lda #0 
 	sta playerIsInScrollMargin
+	sta currentDimension
+	lda #DIMENSION_INVALID
+	sta warpDimensionA
+	sta warpDimensionB
 
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
@@ -718,6 +727,7 @@ test_vertical_collision:
 
 		and #%11110000 ; Align with 16
 		cmp #%11000000 
+		sta temp1
 		bcs @no_collision ; If the y is greater than 12, you're below the screen. Go away.
 
 		; a is now the y coord of the block. temp2 is now the x. 
@@ -742,6 +752,7 @@ test_vertical_collision:
 		clc
 		adc playerYVelocity
 		and #%11110000 ; Align with 16
+		sta temp1
 		; TODO: Header check... and do, something?
 
 		; a is now the y coord of the block. temp2 is now the x.
@@ -760,6 +771,30 @@ test_vertical_collision:
 
 	@no_collision:
 
+	; Test warp collision, too. temp1 is our y
+	lda temp1
+	.repeat 4
+		lsr
+	.endrepeat
+	sta temp1
+	ldy #0
+	@loop_warp:
+		lda lvl1_warp_points, y
+		cmp #$ff
+		beq @done_warp
+		iny
+		lda lvl1_warp_points, y
+		cmp temp1
+		bne @not_warp
+			store #1, warpIntersectY
+		@not_warp:
+		.repeat 3
+			iny
+		.endrepeat
+
+	@done_warp:
+
+
 	rts
 
 ; WARNING: This method has a number of expectations and is kinda specialized to one use case. 
@@ -772,10 +807,75 @@ test_horizontal_collision:
 		lsr temp1
 		ror temp2
 	.endrepeat
+	lda temp2
+	sta temp1
 	lda #%00001111 ; We only want the position % 16 to find our x.
 	and temp2
 	sta temp2
 
+	; temp1 is the position within the level being tested.
+	lda #DIMENSION_INVALID
+	sta warpDimensionA
+	sta warpDimensionB
+
+	lda warpIntersectY
+	cmp #0
+	beq @done_warp
+
+	ldy #0
+	@loop_warp:
+		lda lvl1_warp_points, y
+		cmp #$ff
+		beq @color_warp
+		cmp temp1
+		beq @do_warp
+		lda playerDirection
+		cmp #PLAYER_DIRECTION_RIGHT
+		bne @left
+			lda lvl1_warp_points, y
+			clc
+			adc #1
+			cmp temp1
+			beq @do_warp
+			jmp @after_tests
+		@left: 
+			lda lvl1_warp_points, y
+			sec
+			sbc #1
+			cmp temp1
+			beq @do_warp
+			; fallthru
+		@after_tests:
+
+		.repeat 4 
+			iny
+		.endrepeat
+		jmp @loop_warp
+
+	@do_warp:
+		; its a warp, and we already hit y. Let's do it
+		iny
+		iny
+		lda lvl1_warp_points, y
+		sta warpDimensionA
+		iny
+		lda lvl1_warp_points, y
+		sta warpDimensionB
+
+		lda ppuMaskBuffer
+		and #DIMENSION_MASK^255
+		ora #DIMENSION_FADE
+		sta ppuMaskBuffer
+		jmp @done_warp
+
+
+	@color_warp: 
+		lda ppuMaskBuffer
+		and #DIMENSION_MASK^255
+		ora currentDimension
+		sta ppuMaskBuffer
+
+	@done_warp:
 
 	lda temp3
 	cmp #1
@@ -1315,6 +1415,21 @@ do_sprite0:
 	reset_ppu_scrolling
 	rts
 
+play_music_for_dimension: 
+	lda currentDimension
+	cmp #DIMENSION_PLAIN
+	bne @not_plain
+		lda #SONG_CRAPPY
+		jsr FamiToneMusicPlay
+		rts
+	@not_plain: 
+	cmp #DIMENSION_ICE_AGE
+	bne @not_ice_age
+		lda #SONG_ICE_CRAPPY 
+		jsr FamiToneMusicPlay
+	@not_ice_age:
+	rts
+
 ; Child of do_dimensional_transfer - does the actual fading to decrease code dupe.
 do_fade_anim: 
 	lda currentPalette
@@ -1366,6 +1481,15 @@ do_fade_anim:
 
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
 do_dimensional_transfer:
+
+	lda warpDimensionA
+	cmp currentDimension
+	beq @doit
+	lda warpDimensionB
+	cmp currentDimension
+	beq @doit
+	rts
+	@doit:
 
 	lda #SFX_WARP
 	ldx #SOUND_CHANNEL_PLAYER
@@ -1434,21 +1558,20 @@ do_dimensional_transfer:
 			jsr vblank_wait
 			jsr do_sprite0
 			lda currentDimension
-			cmp #DIMENSION_ICE_AGE
-			bne @not_ice_age
-				; it's an ice age; go back to normal.
-				lda #DIMENSION_PLAIN
+			cmp warpDimensionA
+			bne @not_a
+				; it's a; go to b.
+				lda warpDimensionB
 				jmp @after_swap
-			@not_ice_age:
-				lda #DIMENSION_ICE_AGE
+			@not_a:
+				lda warpDimensionA
 			@after_swap:
 			sta currentDimension
 
 			lda ppuMaskBuffer
 			and #DIMENSION_MASK^255
-			ora currentDimension
+			ora #DIMENSION_FADE
 			sta ppuMaskBuffer
-			;ldx #48
 			jmp @end_loop
 
 
@@ -1479,7 +1602,6 @@ do_dimensional_transfer:
 			txa
 			pha
 			reset_ppu_scrolling
-			;jsr do_sprite0
 			jsr FamiToneUpdate; We're our own little thing.. need to trigger famitone.
 			pla
 			tax 
@@ -1493,6 +1615,7 @@ do_dimensional_transfer:
 	jsr do_sprite0
 	lda temp4
 	sta ppuCtrlBuffer
+	jsr play_music_for_dimension
 	lda #0 ; 0 = play.
 	jsr FamiToneMusicPause
 	rts
@@ -1500,6 +1623,7 @@ do_dimensional_transfer:
 main_loop: 
 
 	jsr handle_main_input
+	store #0, warpIntersectY ; reset warp intersection data. (TODO: This isn't the clearest thing ever written...')
 	jsr do_player_vertical_movement
 	jsr do_player_movement
 	jsr FamiToneUpdate
@@ -1570,7 +1694,7 @@ show_level:
 	ora #%00000100
 	sta ppuCtrlBuffer
 
-	lda #0
+	lda #SONG_CRAPPY
 	jsr FamiToneMusicPlay
 	
 	jmp main_loop
@@ -1654,9 +1778,11 @@ all_music:
 all_sfx: 
 	.include "sound/sfx.s"
 	
-	
+level_data:
 	.include "levels/processed/lvl1.asm"
-	
+
+	.include "levels/lvl1_warps.asm"
+
 default_chr:
 	.incbin "graphics/map_tiles.chr"
 	
@@ -1664,7 +1790,10 @@ default_sprite_chr:
 	.incbin "graphics/sprites.chr"
 	
 default_palettes: 
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$29,$31,$09,$19,$29	
+	; Normal (and probably ice)
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$29,$31,$09,$19,$29
+	; fire-ized
+	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$29,$31,$09,$19,$29
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
