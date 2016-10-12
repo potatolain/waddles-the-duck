@@ -34,6 +34,7 @@
 	temp3: 						.res 1
 	temp4: 						.res 1
 	temp5:						.res 1
+	tempCollision:				.res 1 ; Yes, this is lame.
 	playerPosition:				.res 2
 	playerScreenPosition:		.res 1
 	tempPlayerPosition:			.res 2
@@ -117,6 +118,10 @@
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
 	
 	SPRITE_OFFSCREEN 		= $ef
+
+
+	TILE_PLANT				= $9
+	TILE_PLANT_SPROUT		= $a
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -697,6 +702,38 @@ draw_current_nametable_row:
 	
 	rts
 
+; Expectations: 
+; - a is set to the tile value to test
+; - End result is a is set to 1 if collision, 2 if not.
+; - Any side-effects are applied by this process. (Damage, block breakage, etc)
+do_collision_test:
+	sta tempCollision
+
+	lda currentDimension
+	cmp #DIMENSION_AGGRESSIVE
+	bne @not_fire
+		; We're in the fire dimension. Special rules apply.
+		lda tempCollision
+		cmp #0
+		beq @no_collision
+		cmp #TILE_PLANT
+		beq @no_collision
+		cmp #TILE_PLANT_SPROUT
+		beq @no_collision
+		jmp @collision
+	@not_fire:
+	@default: 
+		lda tempCollision
+		cmp #0
+		beq @no_collision
+
+	@collision: ; intentional fallthru.
+		lda #1
+		rts
+
+	@no_collision:
+		lda #0
+		rts
 
 
 
@@ -739,6 +776,7 @@ test_vertical_collision:
 		tay
 		lda SCREEN_DATA, y
 		and #%00111111
+		jsr do_collision_test
 		cmp #0
 		beq @no_collision
 			store #0, playerYVelocity
@@ -764,6 +802,7 @@ test_vertical_collision:
 		tay
 		lda SCREEN_DATA, y
 		and #%00111111
+		jsr do_collision_test
 		cmp #0
 		beq @no_collision
 			store #0, playerYVelocity
@@ -895,6 +934,7 @@ test_horizontal_collision:
 		tay
 		lda SCREEN_DATA, y
 		and #%00111111
+		jsr do_collision_test
 		cmp #0
 		beq @no_collision
 			store #0, playerVelocity
@@ -915,6 +955,7 @@ test_horizontal_collision:
 		tay 
 		lda SCREEN_DATA, y
 		and #%00111111
+		jsr do_collision_test
 		cmp #0
 		beq @no_collision
 			store #0, playerVelocity
