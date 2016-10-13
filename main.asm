@@ -1808,7 +1808,7 @@ nmi:
 	
 	rti
 	
-	.include "title.asm"
+	.include "menus.asm"
 	
 .segment "BANK0"
 	.include "sound/famitone2.s"
@@ -1829,6 +1829,10 @@ default_chr:
 	
 default_sprite_chr:
 	.incbin "graphics/sprites.chr"
+
+menu_chr_data: 
+	.incbin "graphics/title_tiles.chr"
+
 	
 default_palettes: 
 	; Normal (and probably ice)
@@ -1838,6 +1842,10 @@ default_palettes:
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
+
+menu_palettes: 
+	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
+	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
 
 	
 .segment "CHUNK"

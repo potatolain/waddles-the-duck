@@ -1,24 +1,17 @@
-title_palettes: 
-	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
-	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
-
-title_chr_data: 
-	.incbin "graphics/title_tiles.chr"
-	
-load_title: 
+load_menu: 
 	jsr disable_all
 	jsr vblank_wait
 	ldy #0
 	set_ppu_addr $3f00
 	@palette_loop:
-		lda title_palettes, y
+		lda menu_palettes, y
 		sta PPU_DATA
 		iny
 		cpy #$20
 		bne @palette_loop
 
-	store #<(title_chr_data), tempAddr
-	store #>(title_chr_data), tempAddr+1
+	store #<(menu_chr_data), tempAddr
+	store #>(menu_chr_data), tempAddr+1
 	ldx #0
 	ldy #0
 	set_ppu_addr $0000
@@ -41,7 +34,11 @@ load_title:
 		iny
 		cpy #$40
 		bne @clear_attributes
+	rts
 	
+load_title:
+	jsr load_menu
+
 	write_string "No Name 2016", $2066
 	write_string "NESDev Compo Entry", $20a6
 	
