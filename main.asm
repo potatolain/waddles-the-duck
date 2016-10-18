@@ -69,6 +69,8 @@
 	SCREEN_DATA				= $600
 	NEXT_ROW_CACHE			= $500
 	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
+	LEFT_ATTR_MASK			= %00110011
+	RIGHT_ATTR_MASK			= %11001100
 	SPRITE_DATA				= $200
 	SPRITE_ZERO				= $200
 	PLAYER_SPRITE			= $210
@@ -351,8 +353,8 @@ load_nametable:
 		cpx #32
 		bne @loopdedo
 
-	; Load the first half second, so we seed SCREEN_DATA with the right stuff, rather than overwriting it.
-	ldx #0
+	; Load the first half second, so we seed SCREEN_DATA with the right stuff, rather than overwriting it. (255 so we get 0 because of overflows... likely could be written more clearly.)
+	ldx #255
 	stx levelPosition
 	
 	@loopdedoodle: 
@@ -662,9 +664,14 @@ draw_current_nametable_row:
 
 	lda levelPosition
 	and #%00000001
-	bne @attrs
-	jmp @no_attrs
-		
+	cmp #0
+	bne @right
+		store #LEFT_ATTR_MASK, temp1
+		jmp @attrs
+	@right: 
+		store #RIGHT_ATTR_MASK, temp1
+		; fallthru.
+		store #RIGHT_ATTR_MASK, temp1
 	@attrs: 
 		lda PPU_STATUS
 		lda nametableAddr+1
@@ -681,7 +688,21 @@ draw_current_nametable_row:
 		ldx #0
 		
 		.repeat 6
-			lda NEXT_ROW_ATTRS, x
+			lda PPU_DATA ; dummy read to get the right value, caching, etc...
+			lda temp1
+			eor #$ff ; flip all bits
+			and PPU_DATA ; Grab data and immediately strip out the new bits. 
+			sta temp2
+			lda NEXT_ROW_ATTRS, x ; combine with values...
+			and temp1
+			ora temp2 ; mischief managed.
+			sta temp2
+
+			lda tempAddr+1
+			sta PPU_ADDR
+			lda tempAddr
+			sta PPU_ADDR
+			lda temp2
 			sta PPU_DATA
 			
 			lda tempAddr+1
@@ -696,7 +717,7 @@ draw_current_nametable_row:
 		; Write one last time w/o the memory stuffs.
 		lda NEXT_ROW_ATTRS, x
 		sta PPU_DATA
-	@no_attrs: 
+	@done_attrs: 
 		
 	reset_ppu_scrolling
 	
