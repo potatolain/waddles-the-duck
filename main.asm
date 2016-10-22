@@ -62,7 +62,12 @@
 	warpDimensionA:				.res 1
 	warpDimensionB:				.res 1
 	warpIntersectY:				.res 1
-	
+	tempCollisionTile:			.res 1
+	currentLevel:				.res 1
+	lvlRowDataAddr:				.res 2
+	lvlDataAddr:				.res 2
+	warpDataAddr:				.res 2
+
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
 	CHAR_SPACE				= $ff
@@ -137,6 +142,8 @@
 	TILE_WATER_BENEATH		= 25
 	TILE_PLANT				= 26
 	TILE_ICE_BLOCK			= 27
+
+	TILE_LEVEL_END			= 51
 
 
 	
@@ -265,6 +272,8 @@ ldx #<(all_sfx)
 ldy #>(all_sfx)
 jsr FamiToneSfxInit
 
+store #0, currentLevel
+
 	
 jsr disable_all
 lda	#%10001000	; enable NMI, sprites from pattern table 0,
@@ -336,12 +345,48 @@ load_level:
 	lda #1
 	sta playerIsInScrollMargin
 
-	; TODO: Need some way to know which dimension to load. Must have some metadata for any given level at some point...
-	lda #DIMENSION_PLAIN
-	sta currentDimension
 	lda #DIMENSION_INVALID
 	sta warpDimensionA
 	sta warpDimensionB
+
+
+	; Large amount of weird stuff going on here...
+	; First, grab our level id, then look up the address of the various data for the level... 
+	lda currentLevel
+	asl
+	tax
+	lda leveldata_table, x
+	sta tempAddr
+	inx
+	lda leveldata_table, x
+	sta tempAddr+1
+
+	; Use this to seed the address of the various metadata
+	ldy #0
+	lda (tempAddr), y
+	sta currentDimension
+
+	ldy #4
+	lda (tempAddr), y
+	sta lvlDataAddr
+	iny
+	lda (tempAddr), y
+	sta lvlDataAddr+1
+	iny
+	lda (tempAddr), y
+	sta lvlRowDataAddr
+	iny
+	lda (tempAddr), y
+	sta lvlRowDataAddr+1
+
+	lda tempAddr
+	clc
+	adc #8
+	sta warpDataAddr
+	lda tempAddr+1
+	adc #0
+	sta warpDataAddr+1
+
 
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
@@ -473,16 +518,16 @@ load_current_line:
 
 	lda #0
 	sta tempAddr+1
-	lda lvl1_compressed, y
+	lda (lvlRowDataAddr), y
 	.repeat 4
 		asl
 		rol tempAddr+1
 	.endrepeat
 	clc
-	adc #<(lvl1_compressed_ids)
+	adc lvlDataAddr
 	sta tempAddr
 	lda tempAddr+1
-	adc #>(lvl1_compressed_ids)
+	adc lvlDataAddr+1
 	sta tempAddr+1
 	
 	ldy #0
@@ -740,6 +785,23 @@ draw_current_nametable_row:
 	
 	rts
 
+do_special_tile_stuff:
+	lda tempCollisionTile
+	cmp #TILE_LEVEL_END
+	bne @not_eol
+		; Technically, we're going all abandon ship on our stack here.
+		; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
+		ldx #$ff
+		txs
+		inc currentLevel
+		jmp show_ready
+	@not_eol:
+	rts
+
+reset_collision_state:
+	store #0, tempCollisionTile
+	rts
+
 ; Expectations: 
 ; - a is set to the tile value to test
 ; - End result is a is set to 1 if collision, 2 if not.
@@ -747,10 +809,15 @@ draw_current_nametable_row:
 do_collision_test:
 	sta tempCollision
 
+	cmp #TILE_LEVEL_END
+	beq @special_tile_collision
+
 	cmp #0
 	beq @no_collision
 	cmp #FIRST_VARIABLE_TILE
 	bcc @collision
+	cmp #FIRST_VARIABLE_TILE + 8
+	bcs @collision
 
 	lda currentDimension
 	cmp #DIMENSION_AGGRESSIVE
@@ -785,6 +852,16 @@ do_collision_test:
 	@ice_age:
 		; Pretty much everything is a collision! Ice is a PITA...
 		jmp @collision
+
+	@special_tile_collision:
+		store tempCollision, tempCollisionTile
+		lda #1
+		rts
+
+	@special_tile_no_collision:
+		store tempCollision, tempCollisionTile
+		lda #0
+		rts
 
 
 	@collision: ; intentional fallthru.
@@ -878,11 +955,11 @@ test_vertical_collision:
 	sta temp1
 	ldy #0
 	@loop_warp:
-		lda lvl1_warp_points, y
+		lda (warpDataAddr), y
 		cmp #$ff
 		beq @done_warp
 		iny
-		lda lvl1_warp_points, y
+		lda (warpDataAddr), y
 		cmp temp1
 		bne @not_warp
 			store #1, warpIntersectY
@@ -923,7 +1000,7 @@ test_horizontal_collision:
 
 	ldy #0
 	@loop_warp:
-		lda lvl1_warp_points, y
+		lda (warpDataAddr), y
 		cmp #$ff
 		beq @color_warp
 		cmp temp1
@@ -931,14 +1008,14 @@ test_horizontal_collision:
 		lda playerDirection
 		cmp #PLAYER_DIRECTION_RIGHT
 		bne @left
-			lda lvl1_warp_points, y
+			lda (warpDataAddr), y
 			clc
 			adc #1
 			cmp temp1
 			beq @do_warp
 			jmp @after_tests
 		@left: 
-			lda lvl1_warp_points, y
+			lda (warpDataAddr), y
 			sec
 			sbc #1
 			cmp temp1
@@ -955,10 +1032,10 @@ test_horizontal_collision:
 		; its a warp, and we already hit y. Let's do it
 		iny
 		iny
-		lda lvl1_warp_points, y
+		lda (warpDataAddr), y
 		sta warpDimensionA
 		iny
-		lda lvl1_warp_points, y
+		lda (warpDataAddr), y
 		sta warpDimensionB
 
 		lda currentDimension
@@ -1068,7 +1145,11 @@ do_player_vertical_movement:
 		adc playerYVelocity
 		cmp #SPRITE_OFFSCREEN
 		bcc @not_uhoh
-			jmp reset ; FIXME: Probably should have something else happen on death.
+			ldx #$ff
+			lda #1
+			jsr FamiToneMusicPause
+			txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
+			jmp show_ready ; FIXME: Probably should have something else happen on death.
 		@not_uhoh:
 		sta PLAYER_SPRITE
 		sta PLAYER_SPRITE+4
@@ -1806,9 +1887,11 @@ do_dimensional_transfer:
 main_loop: 
 
 	jsr handle_main_input
-	store #0, warpIntersectY ; reset warp intersection data. (TODO: This isn't the clearest thing ever written...')
+	store #0, warpIntersectY ; reset warp intersection data. (TODO: This isn't the clearest thing ever written...)
+	jsr reset_collision_state
 	jsr do_player_vertical_movement
 	jsr do_player_movement
+	jsr do_special_tile_stuff
 	jsr FamiToneUpdate
 
 	jsr vblank_wait
@@ -1962,10 +2045,17 @@ all_music:
 all_sfx: 
 	.include "sound/sfx.s"
 	
-level_data:
+lvl1:
+	.include "levels/lvl1_meta.asm"
 	.include "levels/processed/lvl1.asm"
 
-	.include "levels/lvl1_warps.asm"
+lvl2:
+	.include "levels/lvl2_meta.asm"
+	.include "levels/processed/lvl2.asm"
+
+leveldata_table: 
+	.word lvl1, lvl2
+
 
 default_chr:
 	.incbin "graphics/map_tiles.chr"
@@ -1979,9 +2069,9 @@ menu_chr_data:
 	
 default_palettes: 
 	; Normal (and probably ice)
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$29,$31,$09,$19,$29
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$28,$31,$09,$19,$29
 	; fire-ized
-	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$29,$31,$09,$19,$29
+	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$09,$19,$29
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
