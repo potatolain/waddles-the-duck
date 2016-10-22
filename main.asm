@@ -335,7 +335,9 @@ load_level:
 	sta playerPosition+1
 	lda #1
 	sta playerIsInScrollMargin
-	lda #0
+
+	; TODO: Need some way to know which dimension to load. Must have some metadata for any given level at some point...
+	lda #DIMENSION_PLAIN
 	sta currentDimension
 	lda #DIMENSION_INVALID
 	sta warpDimensionA
@@ -1618,6 +1620,42 @@ get_row_from_a:
 		lda #TILE_ROW_ICE_AGE
 		rts
 
+draw_switchable_tiles: 
+
+	; Okay, we've gotta swap tiles. Which ones do we want?
+	lda currentDimension
+	jsr get_row_from_a
+	sta temp2
+
+	store #0, tempAddr
+	store temp2, tempAddr+1 ; Row id is an actual row id, so just stick it into the address to start.
+
+	; Now add in the actual position of the nametable. (default_chr may not be 0 aligned, so we gotta do both.)
+	lda tempAddr
+	clc
+	adc #<(default_chr)
+	sta tempAddr
+	lda tempAddr+1
+	adc #>(default_chr)
+	sta tempAddr+1
+
+	; Okay, time to loop over everything.
+	set_ppu_addr SWITCHABLE_ROW_POSITION
+	
+	store #1, temp2
+	ldy #0
+	@loop_tiles:
+		; Should be exactly 512 bytes per row, so loop 2x
+		lda (tempAddr), y
+		sta PPU_DATA
+		iny
+		cpy #0
+		bne @loop_tiles
+		inc tempAddr+1
+		dec temp2
+		cpy temp2 ; Since y is definitely 0, and that's what we wanna count down to.
+		beq @loop_tiles
+	rts
 
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
 do_dimensional_transfer:
@@ -1714,40 +1752,7 @@ do_dimensional_transfer:
 			sta currentDimension
 
 
-			; Okay, we've gotta swap tiles. Which ones do we want?
-			lda currentDimension
-			jsr get_row_from_a
-			sta temp2
-
-			store #0, tempAddr
-			store temp2, tempAddr+1 ; Row id is an actual row id, so just stick it into the address to start.
-
-			; Now add in the actual position of the nametable. (default_chr may not be 0 aligned, so we gotta do both.)
-			lda tempAddr
-			clc
-			adc #<(default_chr)
-			sta tempAddr
-			lda tempAddr+1
-			adc #>(default_chr)
-			sta tempAddr+1
-
-			; Okay, time to loop over everything.
-			set_ppu_addr SWITCHABLE_ROW_POSITION
-			
-			store #1, temp2
-			ldy #0
-			@loop_tiles:
-				; Should be exactly 512 bytes per row, so loop 2x
-				lda (tempAddr), y
-				sta PPU_DATA
-				iny
-				cpy #0
-				bne @loop_tiles
-				inc tempAddr+1
-				dec temp2
-				cpy temp2 ; Since y is definitely 0, and that's what we wanna count down to.
-				beq @loop_tiles
-					
+			jsr draw_switchable_tiles					
 
 			jsr enable_all ; Will put mask data back for us too. 
 			; The 48 is just a guess at how long this bit should take... skip the actual "frames"
@@ -1834,7 +1839,7 @@ main_loop:
 show_level: 
 	jsr disable_all
 	jsr vblank_wait
-	
+
 	; Turn off 32 bit adding for addresses initially.
 	lda ppuCtrlBuffer
 	and #%11111000 ; set to nametable 0
@@ -1843,6 +1848,8 @@ show_level:
 	
 	jsr load_graphics_data
 	jsr load_level
+	jsr draw_switchable_tiles
+
 
 	; Turn on 32 bit adding for addresses to load rows.
 	lda ppuCtrlBuffer
@@ -1872,8 +1879,7 @@ show_level:
 	ora #%00000100
 	sta ppuCtrlBuffer
 
-	lda #SONG_CRAPPY
-	jsr FamiToneMusicPlay
+	jsr play_music_for_dimension
 	
 	jmp main_loop
 	
