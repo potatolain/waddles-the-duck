@@ -559,7 +559,7 @@ draw_to_cache:
 	lda levelPosition
 	and #%00000001
 	cmp #0
-	beq @lvl_odd
+	bne @lvl_odd
 		; Level is even. We want left of the bytes
 		lda temp1
 		and #%00000001
