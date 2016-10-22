@@ -91,6 +91,9 @@
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
+	SWITCHABLE_ROW_POSITION		= $0600; Tile id $60.
+	SWITCHABLE_ROW_HEIGHT		= $200
+
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Dimension definitions
 ;   Also masks for choosing which palettes to use.
@@ -101,8 +104,16 @@
 	DIMENSION_ICE_AGE			= %11000000
 	DIMENSION_AGGRESSIVE		= %00100000
 	DIMENSION_AUTUMN			= %01100000
+	DIMENSION_END_OF_DAYS		= %11100000 ; NOTE: Same as fade.
 	DIMENSION_FADE				= %11100000
 	DIMENSION_INVALID			= %00011111
+
+	TILE_ROW_PLAIN				= 6
+	TILE_ROW_CALM				= 6
+	TILE_ROW_ICE_AGE			= 8
+	TILE_ROW_AGGRESSIVE			= $a
+	TILE_ROW_AUTUMN				= $a
+	TILE_ROW_END_OF_DAYS		= $a
 
 
 	MIN_POSITION_LEFT_SCROLL		= $40
@@ -319,8 +330,9 @@ load_level:
 	sta playerScreenPosition
 	lda #0
 	sta playerPosition+1
-	lda #0 
+	lda #1
 	sta playerIsInScrollMargin
+	lda #0
 	sta currentDimension
 	lda #DIMENSION_INVALID
 	sta warpDimensionA
@@ -1541,6 +1553,34 @@ do_fade_anim:
 		bne @inner_loop_sprites
 	rts
 
+; Quick method to convert accumulator as a dimension id into a row number to start drawing files into the variable tile row.
+get_row_from_a:
+	cmp #DIMENSION_PLAIN
+	beq @plain
+	cmp #DIMENSION_CALM
+	beq @plain
+	cmp #DIMENSION_ICE_AGE
+	beq @ice_age
+	; Fallthru... just use a default to save some instructions.
+	; cmp #DIMENSION_AGGRESSIVE
+	; beq @aggressive
+	; cmp #DIMENSION_AUTUMN
+	; beq @aggressive
+	; cmp #DIMENSION_END_OF_DAYS
+	; beq @aggressive
+	@aggressive:
+	 	lda #TILE_ROW_AGGRESSIVE
+		rts
+
+	@plain: 
+		lda #TILE_ROW_PLAIN
+		rts
+
+	@ice_age: 
+		lda #TILE_ROW_ICE_AGE
+		rts
+
+
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
 do_dimensional_transfer:
 
@@ -1612,13 +1652,18 @@ do_dimensional_transfer:
 				jsr do_sprite0
 			jmp @end_loop
 		@increase_maybe2:
-		cpx #48
-		bcs @increase
+		cpx #33
+		bne @increase
 
 			; This is where we turn things off and do our tile swaps, switch to a different palette, change the dimension, etc. The world is your lobster. (yes, lobster)
 			; TODO: Probably need this passed in. temp5 is unused, or we could define one just for this. 
 			jsr vblank_wait
 			jsr do_sprite0
+			jsr FamiToneUpdate
+			jsr disable_all
+			jsr vblank_wait
+			jsr FamiToneUpdate
+
 			lda currentDimension
 			cmp warpDimensionA
 			bne @not_a
@@ -1630,12 +1675,45 @@ do_dimensional_transfer:
 			@after_swap:
 			sta currentDimension
 
-			lda ppuMaskBuffer
-			and #DIMENSION_MASK^255
-			ora #DIMENSION_FADE
-			sta ppuMaskBuffer
-			jmp @end_loop
 
+			; Okay, we've gotta swap tiles. Which ones do we want?
+			lda currentDimension
+			jsr get_row_from_a
+			sta temp2
+
+			store #0, tempAddr
+			store temp2, tempAddr+1 ; Row id is an actual row id, so just stick it into the address to start.
+
+			; Now add in the actual position of the nametable. (default_chr may not be 0 aligned, so we gotta do both.)
+			lda tempAddr
+			clc
+			adc #<(default_chr)
+			sta tempAddr
+			lda tempAddr+1
+			adc #>(default_chr)
+			sta tempAddr+1
+
+			; Okay, time to loop over everything.
+			set_ppu_addr SWITCHABLE_ROW_POSITION
+			
+			store #1, temp2
+			ldy #0
+			@loop_tiles:
+				; Should be exactly 512 bytes per row, so loop 2x
+				lda (tempAddr), y
+				sta PPU_DATA
+				iny
+				cpy #0
+				bne @loop_tiles
+				inc tempAddr+1
+				dec temp2
+				cpy temp2 ; Since y is definitely 0, and that's what we wanna count down to.
+				beq @loop_tiles
+					
+
+			jsr enable_all ; Will put mask data back for us too. 
+			; The 48 is just a guess at how long this bit should take... skip the actual "frames"
+			jmp @end_loop
 
 		@increase:
 
