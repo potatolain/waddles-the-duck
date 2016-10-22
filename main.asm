@@ -132,9 +132,12 @@
 	
 	SPRITE_OFFSCREEN 		= $ef
 
+	FIRST_VARIABLE_TILE		= 24
+	TILE_WATER				= 24
+	TILE_WATER_BENEATH		= 25
+	TILE_PLANT				= 26
+	TILE_ICE_BLOCK			= 27
 
-	TILE_PLANT				= $9
-	TILE_PLANT_SPROUT		= $a
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -742,23 +745,45 @@ draw_current_nametable_row:
 do_collision_test:
 	sta tempCollision
 
+	cmp #0
+	beq @no_collision
+	cmp #FIRST_VARIABLE_TILE
+	bcc @collision
+
 	lda currentDimension
 	cmp #DIMENSION_AGGRESSIVE
-	bne @not_fire
+	beq @fire
+	cmp #DIMENSION_AUTUMN
+	beq @fire
+	cmp #DIMENSION_ICE_AGE
+	beq @ice_age
+	; By default, fallthrough to @default. Hits calm and normal. (And I guess end of days)
+
+
+	@default: 
+		lda tempCollision
+		cmp #TILE_WATER
+		beq @no_collision
+		cmp #TILE_ICE_BLOCK
+		beq @no_collision
+		jmp @collision
+
+
+ 	@fire:
 		; We're in the fire dimension. Special rules apply.
 		lda tempCollision
-		cmp #0
+		cmp #TILE_WATER
 		beq @no_collision
 		cmp #TILE_PLANT
 		beq @no_collision
-		cmp #TILE_PLANT_SPROUT
+		cmp #TILE_ICE_BLOCK
 		beq @no_collision
 		jmp @collision
-	@not_fire:
-	@default: 
-		lda tempCollision
-		cmp #0
-		beq @no_collision
+
+	@ice_age:
+		; Pretty much everything is a collision! Ice is a PITA...
+		jmp @collision
+
 
 	@collision: ; intentional fallthru.
 		lda #1
@@ -933,6 +958,15 @@ test_horizontal_collision:
 		iny
 		lda lvl1_warp_points, y
 		sta warpDimensionB
+
+		lda currentDimension
+		cmp warpDimensionA
+		beq @do_warp_color
+		cmp warpDimensionB
+		beq @do_warp_color
+		jmp @done_warp
+
+		@do_warp_color:
 
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
@@ -1501,7 +1535,11 @@ play_music_for_dimension:
 	bne @not_ice_age
 		lda #SONG_ICE_CRAPPY 
 		jsr FamiToneMusicPlay
+		rts
 	@not_ice_age:
+	; Fall back to default track for consistency's sake.
+	lda #SONG_CRAPPY
+	jsr FamiToneMusicPlay 
 	rts
 
 ; Child of do_dimensional_transfer - does the actual fading to decrease code dupe.
