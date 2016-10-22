@@ -4,10 +4,15 @@ load_menu:
 	lda #0
 	sta scrollX
 	sta scrollY
-	; Make sure we're not writing every 32nd byte rather than every single one.
+	; Make sure we're not writing every 32nd byte rather than every single one, and force back to nametable 0
 	lda ppuCtrlBuffer
-	and #%11111011
+	and #%11111000
 	sta ppuCtrlBuffer
+	jsr vblank_wait
+
+	lda ppuMaskBuffer
+	and #%11110111
+	sta ppuMaskBuffer ; Stop rendering sprites
 
 	; Hide all sprites
 	ldx #0
@@ -68,6 +73,8 @@ load_menu:
 		iny
 		cpy #$40
 		bne @clear_attributes
+
+	reset_ppu_scrolling
 	rts
 	
 load_title:
@@ -105,7 +112,7 @@ show_title:
 		jsr vblank_wait
 		
 		; Check for start button...
-		
+
 		; Make sure we don't count keypresses from last cycle.
 		lda lastCtrlButtons
 		eor #$ff ; flip the bits.
@@ -116,6 +123,10 @@ show_title:
 
 		jmp @loopa
 	@game_time: 
+		lda #SFX_MENU
+		ldx #FT_SFX_CH0
+		jsr FamiToneSfxPlay
+
 		jmp show_ready
 
 
@@ -124,27 +135,33 @@ load_ready:
 
 	write_string "Ready!", $218b
 
-	jsr enable_all
 	reset_ppu_scrolling
+	jsr enable_all
 	rts
 
 show_ready:
+	lda #1
+	jsr FamiToneMusicPause
 	jsr load_ready
 
+	lda #0
+	sta scrollX
+	sta scrollY
 	ldx #0
 	@loopa: 
 		txa
 		pha
+		; Not really doing anything... just makes it look less like we're locked for frames. Could easily be ditched.
+		jsr read_controller
 		jsr FamiToneUpdate
+		reset_ppu_scrolling
 		jsr vblank_wait
+		reset_ppu_scrolling
 		pla
 		tax
 		inx
-		cpx #64
+		cpx #READY_TIME
 		bne @loopa
 
 	game_time: 
-		lda #SFX_MENU
-		ldx #FT_SFX_CH0
-		jsr FamiToneSfxPlay
 		jmp show_level

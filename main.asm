@@ -145,6 +145,9 @@
 
 	TILE_LEVEL_END			= 51
 
+	; How many frames to show the "ready" screen for.
+	READY_TIME				= 48
+
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -1145,9 +1148,9 @@ do_player_vertical_movement:
 		adc playerYVelocity
 		cmp #SPRITE_OFFSCREEN
 		bcc @not_uhoh
-			ldx #$ff
 			lda #1
 			jsr FamiToneMusicPause
+			ldx #$ff
 			txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
 			jmp show_ready ; FIXME: Probably should have something else happen on death.
 		@not_uhoh:
