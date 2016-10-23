@@ -56,6 +56,7 @@
 	playerYVelocity:			.res 1
 	flightTimer:				.res 1
 	playerDirection:			.res 1
+	lastPlayerDirection:		.res 1
 	famitoneScratch:			.res 3
 	currentDimension:			.res 1
 	currentPalette:				.res 1
@@ -485,7 +486,8 @@ seed_level_position_l:
 		lsr temp0
 		ror levelPosition
 	.endrepeat
-
+	dec levelPosition ; Jump back one row, once again to keep it offscreen.
+	
 	rts
 
 seed_level_position_r:
@@ -507,6 +509,44 @@ seed_level_position_r:
 	.endrepeat
 	inc levelPosition ; Jump up one row, to keep it off-screen.
 
+	rts
+
+; "lightweight" version of the method below, to be used multiple times when the player changes direction 
+; in order to fill in the collision table adequately.
+load_current_line_light:
+	ldy levelPosition
+
+	lda #0
+	sta tempAddr+1
+	lda (lvlRowDataAddr), y
+	.repeat 4
+		asl
+		rol tempAddr+1
+	.endrepeat
+	clc
+	adc lvlDataAddr
+	sta tempAddr
+	lda tempAddr+1
+	adc lvlDataAddr+1
+	sta tempAddr+1
+	
+	ldy #0
+	lda levelPosition
+	and #%00001111
+	tax ; x is now the position to apply to screen. 0-15, loopinate.
+	
+	@loop:
+	
+		lda (tempAddr), y
+		sta SCREEN_DATA, x
+		iny
+		txa
+		clc
+		adc #16
+		tax
+		cpy #16
+		
+		bne @loop
 	rts
 
 
@@ -1225,8 +1265,7 @@ do_player_movement:
 		; right
 		jsr seed_level_position_r
 		jmp @after_seed
-	@collision_left: 
-		; right
+	@collision_left:
 		jsr seed_level_position_l
 	@after_seed:
 		lda tempPlayerPosition 
@@ -1453,6 +1492,9 @@ handle_main_input:
 	lda #0
 	sta playerVelocity
 	jsr read_controller
+
+	lda playerDirection
+	sta lastPlayerDirection
 	
 	lda ctrlButtons
 	and #CONTROLLER_LEFT
@@ -1561,7 +1603,7 @@ load_sprite0:
 	sta SPRITE_ZERO+1
 	lda #%00000000
 	sta SPRITE_ZERO+2
-	lda #$f0
+	lda #$80
 	sta SPRITE_ZERO+3
 	; set y last as we test on it.
 	lda #SPRITE_ZERO_POSITION
@@ -1918,8 +1960,32 @@ main_loop:
 		@do_draw:
 		jsr draw_current_nametable_row
 	@go_on:
+
 	jsr do_sprite0
-	
+
+	lda playerDirection
+	cmp lastPlayerDirection
+	beq @no_dir_change
+		; Direction changed... our window to the world is a bit small, so we have to compensate by re-drawing a bunch of the collision table.
+		; TODO: If we have too many cycles and the framerate is suffering, there's likely a smarter way to do this.
+		cmp #PLAYER_DIRECTION_LEFT
+		bne @right_reload
+			; left
+			.repeat 8
+				inc levelPosition
+				jsr load_current_line_light
+			.endrepeat
+			jmp @no_dir_change
+		@right_reload: 
+			.repeat 8
+				dec levelPosition
+				jsr load_current_line_light
+			.endrepeat
+			; intentional fallthru to no_dir_change
+
+	@no_dir_change:
+
+
 	jmp main_loop
 	
 show_level: 

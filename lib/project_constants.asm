@@ -1,4 +1,4 @@
-.define  		BUILD 			1915  
+.define  		BUILD 			1947  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Sat 10/22/2016 19:03" 
-.define 		SPLASH_MESSAGE 	"Does not contain the BFG9000    Or the BFG9001 " 
+.define 		BUILD_DATE		"Sun 10/23/2016 15:33" 
+.define 		SPLASH_MESSAGE 	"Afraid of ducks " 
