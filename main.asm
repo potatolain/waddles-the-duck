@@ -68,6 +68,7 @@
 	lvlRowDataAddr:				.res 2
 	lvlDataAddr:				.res 2
 	warpDataAddr:				.res 2
+	paletteAddr:				.res 2
 
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
@@ -369,6 +370,7 @@ load_level:
 	ldy #0
 	lda (tempAddr), y
 	sta currentDimension
+	jsr seed_palette
 
 	ldy #4
 	lda (tempAddr), y
@@ -1667,6 +1669,42 @@ do_sprite0:
 	reset_ppu_scrolling
 	rts
 
+seed_palette:
+	lda currentDimension
+	cmp #DIMENSION_AGGRESSIVE
+	beq @aggressive
+
+	@default: 
+		store #0, currentPalette
+		rts
+
+	@aggressive:
+		store #1, currentPalette
+		rts
+
+load_palettes_for_dimension:
+	txa
+	pha
+
+	ldx currentPalette
+	.repeat 4
+		asl
+	.endrepeat
+
+	set_ppu_addr $3f00
+	ldy #0
+	@loop:
+		
+		lda default_palettes, x
+		sta PPU_DATA
+		iny
+		inx
+		cpy #16
+		bne @loop
+	pla
+	tax	 
+	rts
+
 play_music_for_dimension: 
 	lda currentDimension
 	cmp #DIMENSION_PLAIN
@@ -1716,10 +1754,7 @@ do_fade_anim:
 	
 	; ppu addr is correct from above; no need to reset.
 	ldy #16
-	txa
-	sec
-	sbc #16
-	tax
+	ldx #0 ; only one palette for sprites for now.
 	@inner_loop_sprites:
 		lda default_sprite_palettes, x
 		sec
@@ -1892,9 +1927,9 @@ do_dimensional_transfer:
 				lda warpDimensionA
 			@after_swap:
 			sta currentDimension
+			jsr seed_palette
 
-
-			jsr draw_switchable_tiles					
+			jsr draw_switchable_tiles		
 
 			jsr enable_all ; Will put mask data back for us too. 
 			; The 48 is just a guess at how long this bit should take... skip the actual "frames"
@@ -2017,6 +2052,7 @@ show_level:
 	jsr load_graphics_data
 	jsr load_level
 	jsr draw_switchable_tiles
+	jsr load_palettes_for_dimension
 
 
 	; Turn on 32 bit adding for addresses to load rows.
@@ -2156,6 +2192,7 @@ default_palettes:
 	; Normal (and probably ice)
 	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$28,$31,$09,$19,$29
 	; fire-ized
+fire_palettes:
 	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$09,$19,$29
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
