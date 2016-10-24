@@ -1163,9 +1163,25 @@ do_player_vertical_movement:
 		store #PLAYER_VELOCITY_FALLING, playerYVelocity
 	@non_zero:
 
+	; Test 3 positions... left, middle, right. Middle because we're fatter than a single tile, and you could otherwise land right between two tiles.
 	; Player's position is now in playerPosition[2]. And in temp1/temp2.
+
+	; left
 	jsr test_vertical_collision
 
+	; middle
+	lda playerPosition
+	clc
+	adc #PLAYER_WIDTH/2
+	sta temp2
+	lda playerPosition+1
+	adc #0
+	sta temp1
+
+	; We shifted you.. now repeat. 
+	jsr test_vertical_collision
+
+	; right
 	lda playerPosition
 	clc
 	adc #PLAYER_WIDTH
@@ -1176,7 +1192,7 @@ do_player_vertical_movement:
 
 	; We shifted you.. now repeat. 
 	jsr test_vertical_collision
-	
+
 	
 	lda playerYVelocity
 	cmp #0
