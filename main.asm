@@ -2168,11 +2168,11 @@ all_sfx:
 	
 lvl1:
 	.include "levels/lvl1_meta.asm"
-	.include "levels/processed/lvl1.asm"
+	.include "levels/processed/lvl1_tiles.asm"
 
 lvl2:
 	.include "levels/lvl2_meta.asm"
-	.include "levels/processed/lvl2.asm"
+	.include "levels/processed/lvl2_tiles.asm"
 
 leveldata_table: 
 	.word lvl1, lvl2

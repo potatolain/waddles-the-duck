@@ -23,7 +23,8 @@ VERSION=0.1a
 ### USER EDITABLE STUFF ENDS HERE
 
 
-LEVELS=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %.asm, $(wildcard levels/*.json)))
+LEVELS=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_tiles.asm, $(wildcard levels/*.json)))
+SPRITES=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_sprites.asm, $(wildcard levels/*.json)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Hacky magic to read a random line from our file of splash messages.
@@ -38,7 +39,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants sound_files convert_levels build 
+all: generate_constants sound_files convert_levels convert_sprites build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -66,10 +67,14 @@ else
 endif
 
 
-levels/processed/%.asm: levels/%.json
+levels/processed/%_tiles.asm: levels/%.json
 	$(NODE) ./tools/level-converter $<
 
+levels/processed/%_sprites.asm: levels/%.json
+	$(NODE) ./tools/sprite-converter $<
+
 convert_levels: $(LEVELS)
+convert_sprites: $(SPRITES)
 
 build: 
 	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes ../main.asm

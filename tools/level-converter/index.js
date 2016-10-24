@@ -1,11 +1,10 @@
 /**
  * Quick-n-dirty level converter. Takes levels from tiled format and converts them to our level format.
- * Expects height to be < 16px, file to have 1 layer, and a length of < 255 columns. 
+ * Expects height to be < 16px, file to have 2 layers, and a length of < 255 columns. 
  * Tile ids must be <= 255; 0-63 unique tiles, then top 2 bits handle palette.
  * 
  * Very, very specific to this use-case. (I tried to document, but this is really a hacked-together pile of code...)
  * Any levels you have in BASE/levels/*.json will be converted by the makefile. 
- * TODO: How do we deal with enemies? Second tiled layer perhaps? 
  */
 
 var path = require('path'),
@@ -97,7 +96,7 @@ if (file === null) {
 if (outFile === null) {
 	var inFile = path.join(process.cwd(), file),
 		fileDir = path.join(path.dirname(inFile), 'processed'),
-		outFile = path.join(fileDir, path.basename(inFile, '.json') + '.asm');
+		outFile = path.join(fileDir, path.basename(inFile, '.json') + '_tiles.asm');
 
 	if (!fs.existsSync(fileDir)) {
 		verbose('Making directory for output: "' + fileDir + '"');
