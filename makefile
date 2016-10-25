@@ -106,3 +106,11 @@ space_check:
 
 upload: 
 	$(UPLOADER) bin/main.nes
+
+clean: 
+	rm bin/*.nes
+	rm bin/cartridge.bin
+	rm bin/main*.bin
+	rm bin/*.dbg
+	rm bin/mainDetails.txt
+	rm levels/processed/*.asm

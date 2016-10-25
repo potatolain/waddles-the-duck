@@ -22,8 +22,8 @@
 ; $520-5ff: Unused.
 ; $600-6ff: Unused.
 ; $700-7ff: World map data.
-	
-	
+
+		
 .segment "ZEROPAGE"
 	; 6 "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
@@ -82,6 +82,7 @@
 	SPRITE_ZERO				= $200
 	PLAYER_SPRITE			= $210
 	PLAYER_BOTTOM_SPRITE	= PLAYER_SPRITE+12
+	PLAYER_SPRITE_ID		= $c6
 	
 	PLAYER_VELOCITY_NORMAL 		= $01
 	PLAYER_VELOCITY_FAST		= $02
@@ -139,6 +140,8 @@
 	
 	SPRITE_OFFSCREEN 		= $ef
 
+	FIRST_NO_COLLIDE_TILE	= 8
+	LAST_NO_COLLIDE_TILE	= 16
 	FIRST_VARIABLE_TILE		= 24
 	TILE_WATER				= 24
 	TILE_WATER_BENEATH		= 25
@@ -442,32 +445,32 @@ load_nametable:
 	
 initialize_player_sprite: 
 	store #$8f, PLAYER_SPRITE
-	store #$0, PLAYER_SPRITE+1
+	store #PLAYER_SPRITE_ID, PLAYER_SPRITE+1
 	store #$0, PLAYER_SPRITE+2
 	store #$20, PLAYER_SPRITE+3
 	
 	store #$8f, PLAYER_SPRITE+4
-	store #$1, PLAYER_SPRITE+5
+	store #PLAYER_SPRITE_ID+1, PLAYER_SPRITE+5
 	store #$0, PLAYER_SPRITE+6
 	store #$28, PLAYER_SPRITE+7
 	
 	store #$8f, PLAYER_SPRITE+8
-	store #$2, PLAYER_SPRITE+9
+	store #PLAYER_SPRITE_ID+2, PLAYER_SPRITE+9
 	store #$0, PLAYER_SPRITE+10
 	store #$30, PLAYER_SPRITE+11
 	
 	store #$97, PLAYER_SPRITE+12
-	store #$10, PLAYER_SPRITE+13
+	store #PLAYER_SPRITE_ID+$10, PLAYER_SPRITE+13
 	store #$0, PLAYER_SPRITE+14
 	store #$20, PLAYER_SPRITE+15
 	
 	store #$97, PLAYER_SPRITE+16
-	store #$11, PLAYER_SPRITE+17
+	store #PLAYER_SPRITE_ID+$11, PLAYER_SPRITE+17
 	store #$0, PLAYER_SPRITE+18
 	store #$28, PLAYER_SPRITE+19
 	
 	store #$97, PLAYER_SPRITE+20
-	store #$12, PLAYER_SPRITE+21 
+	store #PLAYER_SPRITE_ID+$12, PLAYER_SPRITE+21 
 	store #$0, PLAYER_SPRITE+22
 	store #$30, PLAYER_SPRITE+23
 	
@@ -859,6 +862,14 @@ do_collision_test:
 
 	cmp #0
 	beq @no_collision
+
+	cmp #FIRST_NO_COLLIDE_TILE
+	bcc @not_nocollide
+	cmp #LAST_NO_COLLIDE_TILE
+	bcs @not_nocollide
+		jmp @no_collision
+	@not_nocollide:
+
 	cmp #FIRST_VARIABLE_TILE
 	bcc @collision
 	cmp #FIRST_VARIABLE_TILE + 8
@@ -1374,6 +1385,7 @@ do_player_movement:
 	bne @continue
 		lda playerDirection
 		clc
+		adc #PLAYER_SPRITE_ID
 		sta PLAYER_SPRITE+1
 		adc #1
 		sta PLAYER_SPRITE+5
@@ -1415,6 +1427,7 @@ do_player_movement:
 	adc temp0
 	adc #3 ; Add 3 to skip the "standing still" tile.
 
+	adc #PLAYER_SPRITE_ID
 	adc playerDirection
 	sta PLAYER_SPRITE+1
 	adc #1
@@ -2190,10 +2203,10 @@ menu_chr_data:
 	
 default_palettes: 
 	; Normal (and probably ice)
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$28,$31,$09,$19,$29
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$28,$31,$3d,$00,$30
 	; fire-ized
 fire_palettes:
-	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$09,$19,$29
+	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$3d,$00,$30
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
