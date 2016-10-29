@@ -67,8 +67,11 @@
 	currentLevel:				.res 1
 	lvlRowDataAddr:				.res 2
 	lvlDataAddr:				.res 2
+	lvlSpriteDataAddr:			.res 2
 	warpDataAddr:				.res 2
 	paletteAddr:				.res 2
+	currentSprite:				.res 1
+	xScrollChange:				.res 1
 
 	CHAR_TABLE_START 		= $e0
 	NUM_SYM_TABLE_START	 	= $d0
@@ -76,6 +79,7 @@
 	SCREEN_DATA				= $600
 	NEXT_ROW_CACHE			= $500
 	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
+	EXTENDED_SPRITE_DATA	= $560
 	LEFT_ATTR_MASK			= %00110011
 	RIGHT_ATTR_MASK			= %11001100
 	SPRITE_DATA				= $200
@@ -83,6 +87,10 @@
 	PLAYER_SPRITE			= $210
 	PLAYER_BOTTOM_SPRITE	= PLAYER_SPRITE+12
 	PLAYER_SPRITE_ID		= $c6
+	FIRST_VAR_SPRITE		= $230
+	VAR_SPRITE_DATA			= FIRST_VAR_SPRITE
+	LAST_VAR_SPRITE			= $2fc
+	NUM_VAR_SPRITES			= 12
 	
 	PLAYER_VELOCITY_NORMAL 		= $01
 	PLAYER_VELOCITY_FAST		= $02
@@ -92,6 +100,7 @@
 	PLAYER_JUMP_TIME			= $10
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
+	PLAYER_DIRECTION_MASK		= %00100000
 	SPRITE_ZERO_POSITION		= $27
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
@@ -137,6 +146,7 @@
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
+	SPRITE_SCREEN_OFFSET	= 16
 	
 	SPRITE_OFFSCREEN 		= $ef
 
@@ -188,6 +198,34 @@
 	; HAAAAAX (Overrides something needed in famitone that isn't properly defined for ca65)
 	FT_PITCH_FIX = 0
 	
+
+/*
+;;;;;;;;;;;;;;;;;;;;;
+; Sprite Data map
+
+Store all sprite info in a 60 byte table, with 8 bytes per sprite. 
+; 0+1: full-blown x position.  SPRITE_DATA+x is abbreviated version
+; 2		y position
+; 3 	id
+; 4 	alive? (binary... could use this for more)
+; 5		direction (Also binary) + anim state
+; 6		type?
+; 7		sprite-specific data
+*/
+SPRITE_DATA_X 			= 0
+SPRITE_DATA_Y 			= 2
+SPRITE_DATA_ID			= 3
+SPRITE_DATA_DIRECTION 	= 5
+SPRITE_DATA_ANIM_STATE	= 5
+SPRITE_DATA_ALIVE		= 4
+SPRITE_DATA_TYPE		= 6
+SPRITE_DATA_CUSTOM		= 7
+
+SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
+SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
+SPRITE_DIRECTION_LEFT			= PLAYER_DIRECTION_LEFT
+SPRITE_DIRECTION_RIGHT 			= PLAYER_DIRECTION_RIGHT
+
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Our Sound Settings
 	SOUND_CHANNEL_PLAYER = FT_SFX_CH0
@@ -353,9 +391,20 @@ load_level:
 	lda #1
 	sta playerIsInScrollMargin
 
+	lda #SPRITE_OFFSCREEN
+	ldx #<(EXTENDED_SPRITE_DATA)
+	@loop_desprite:
+		sta EXTENDED_SPRITE_DATA, x
+		inx
+		cpx #0
+		bne @loop_desprite
+
 	lda #DIMENSION_INVALID
 	sta warpDimensionA
 	sta warpDimensionB
+
+	lda #0
+	sta currentSprite
 
 
 	; Large amount of weird stuff going on here...
@@ -387,10 +436,16 @@ load_level:
 	iny
 	lda (tempAddr), y
 	sta lvlRowDataAddr+1
+	iny
+	lda (tempAddr), y
+	sta lvlSpriteDataAddr
+	iny
+	lda (tempAddr), y
+	sta lvlSpriteDataAddr+1
 
 	lda tempAddr
 	clc
-	adc #8
+	adc #10
 	sta warpDataAddr
 	lda tempAddr+1
 	adc #0
@@ -596,6 +651,73 @@ load_current_line:
 		cpy #16
 		
 		bne @loop
+
+	; The row **also** has sprites! Maybe!
+	ldy #0
+	@loop_sprites:
+		lda (lvlSpriteDataAddr), y
+		cmp #$ff
+		beq @done_sprites
+		cmp levelPosition
+		bne @move_on
+			lda currentSprite
+			clc 
+			adc #$8
+			sta currentSprite
+			cmp #(NUM_VAR_SPRITES*8)
+			bne @okay
+				; oh noes, we looped! Go back to square 1.
+				lda #0
+				sta currentSprite
+			@okay:
+			ldx currentSprite
+
+			iny
+			lda (lvlSpriteDataAddr), y ; Y Position of the sprite
+			clc
+			adc #3 ; Add three because header...
+			.repeat 4
+				asl
+			.endrepeat
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+			iny
+			lda (lvlSpriteDataAddr), y ; sprite id.
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
+			lda #0
+			sta tempAddr+1
+			lda levelPosition
+			sta tempAddr
+			.repeat 4 ; get levelPosition to a full-length position...
+				asl tempAddr
+				rol tempAddr+1
+			.endrepeat
+			lda tempAddr
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+			lda tempAddr+1
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+			
+			lda #0
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_CUSTOM, x
+			; TODO: need a real type - have to look this up from sprite_data. That's going to be... fun...
+			; Then we can draw this stuff as it goes on screen!
+			; For now, everything's a coin...
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+
+
+			lda #0
+
+			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
+			iny
+			ldx temp5 ; put that thing back where it came from, or so help me.
+			jmp @loop_sprites 
+		@move_on:
+		.repeat 3
+			iny
+		.endrepeat
+		jmp @loop_sprites
+	@done_sprites:
 	rts
 	
 ; Draws the tile in a to the next 4 positions in NEXT_ROW_CACHE. 
@@ -1169,6 +1291,7 @@ test_horizontal_collision:
 do_player_vertical_movement:
 	store playerPosition+1, temp1
 	store playerPosition, temp2
+	store #0, xScrollChange
 
 	lda playerYVelocity
 	cmp #0
@@ -1468,6 +1591,11 @@ do_player_movement:
 		jmp @dont_scroll
 		
 	@do_scroll_l: 
+		lda #0
+		sec
+		sbc playerVelocity
+		sta xScrollChange
+
 		lda scrollX
 		clc
 		adc playerVelocity
@@ -1484,6 +1612,11 @@ do_player_movement:
 		
 	
 	@do_scroll_r: 
+		lda #0
+		sec
+		sbc playerVelocity
+		sta xScrollChange
+
 		lda scrollX
 		clc
 		adc playerVelocity
@@ -1517,6 +1650,118 @@ do_player_movement:
 	@dont_scroll: 
 	
 
+	rts
+
+do_sprite_movement:
+	lda levelPosition
+	pha
+	jsr seed_level_position_l
+	lda levelPosition
+	sta tempAddr
+	lda #0
+	sta tempAddr+1
+	.repeat 4
+		asl tempAddr
+		rol tempAddr+1
+	.endrepeat
+	
+	lda xScrollChange
+	cmp #0
+	bne @undone
+		jmp @done
+	@undone:
+
+	lda scrollX
+	and #%00001111
+	sta temp2
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_RIGHT
+	beq @no_change
+		; TODO: Document why this had to be done.
+		lda temp2
+		sec
+		sbc #2
+		and #%00001111
+		sta temp2
+	@no_change:
+
+
+	ldx #0
+	@loop:
+		txa
+		pha
+		.repeat 3
+			asl
+		.endrepeat
+		tax
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		sec
+		sbc #SPRITE_SCREEN_OFFSET+1
+		sbc tempAddr
+		sta temp1
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		sbc tempAddr+1
+		cmp #0
+		bne @remove
+			txa
+			asl ; each sprite has up to 4 subsprites. So, go from base 8 to base 16
+			tay
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+			cmp #0 ; Last chance, GET OUT
+			beq @remove
+			sta VAR_SPRITE_DATA, y
+			sta VAR_SPRITE_DATA+4, y
+			clc
+			adc #8
+			sta VAR_SPRITE_DATA+8, y
+			sta VAR_SPRITE_DATA+12, y
+			lda temp1
+			sec
+			sbc temp2
+			sta VAR_SPRITE_DATA+3, y
+			sta VAR_SPRITE_DATA+11, y
+			clc
+			adc #8
+			sta VAR_SPRITE_DATA+7, y
+			sta VAR_SPRITE_DATA+15, y
+
+			; TODO: Make not every sprite a coin!
+			lda #0
+			sta VAR_SPRITE_DATA+1, y
+			sta VAR_SPRITE_DATA+2, y
+			sta VAR_SPRITE_DATA+6, y
+			sta VAR_SPRITE_DATA+10, y
+			sta VAR_SPRITE_DATA+14, y
+			clc
+			adc #1
+			sta VAR_SPRITE_DATA+5, y
+			clc
+			adc #$f
+			sta VAR_SPRITE_DATA+9, y
+			adc #1
+			sta VAR_SPRITE_DATA+13, y
+			jmp @continue
+		@remove: 
+			txa
+			asl
+			tax
+			lda #SPRITE_OFFSCREEN
+			.repeat 16, I
+				sta VAR_SPRITE_DATA+I, x
+			.endrepeat
+			; fallthru to continue
+		@continue:
+		pla
+		tax
+		inx
+		cpx #NUM_VAR_SPRITES
+		beq @done
+		jmp @loop
+
+	@done:
+	pla
+	sta levelPosition
 	rts
 	
 handle_main_input: 
@@ -2001,6 +2246,7 @@ main_loop:
 	jsr do_player_vertical_movement
 	jsr do_player_movement
 	jsr do_special_tile_stuff
+	jsr do_sprite_movement
 	jsr FamiToneUpdate
 
 	jsr vblank_wait
@@ -2169,6 +2415,7 @@ nmi:
 	rti
 	
 	.include "menus.asm"
+	.include "lib/sprites.asm"
 	
 .segment "BANK0"
 	.include "sound/famitone2.s"
@@ -2182,10 +2429,12 @@ all_sfx:
 lvl1:
 	.include "levels/lvl1_meta.asm"
 	.include "levels/processed/lvl1_tiles.asm"
+	.include "levels/processed/lvl1_sprites.asm"
 
 lvl2:
 	.include "levels/lvl2_meta.asm"
 	.include "levels/processed/lvl2_tiles.asm"
+	.include "levels/processed/lvl2_sprites.asm"
 
 leveldata_table: 
 	.word lvl1, lvl2
