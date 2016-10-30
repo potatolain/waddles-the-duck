@@ -17,11 +17,12 @@
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
-; $400-4ff: Unused
+; $400-41f: Current level data.
+; $420-4ff: Unused (Reserved: static collectible data)
 ; $500-55f: Screen buffer
-; $520-5ff: Unused.
-; $600-6ff: Unused.
-; $700-7ff: World map data.
+; $560-5ff: Extended sprite data
+; $600-6ff: Map data
+; $700-7ff: Unused
 
 		
 .segment "ZEROPAGE"
@@ -73,24 +74,26 @@
 	currentSprite:				.res 1
 	xScrollChange:				.res 1
 
-	CHAR_TABLE_START 		= $e0
-	NUM_SYM_TABLE_START	 	= $d0
-	CHAR_SPACE				= $ff
-	SCREEN_DATA				= $600
-	NEXT_ROW_CACHE			= $500
-	NEXT_ROW_ATTRS			= $540 ; This could share space with cache if needed.
-	EXTENDED_SPRITE_DATA	= $560
-	LEFT_ATTR_MASK			= %00110011
-	RIGHT_ATTR_MASK			= %11001100
-	SPRITE_DATA				= $200
-	SPRITE_ZERO				= $200
-	PLAYER_SPRITE			= $210
-	PLAYER_BOTTOM_SPRITE	= PLAYER_SPRITE+12
-	PLAYER_SPRITE_ID		= $c6
-	FIRST_VAR_SPRITE		= $230
-	VAR_SPRITE_DATA			= FIRST_VAR_SPRITE
-	LAST_VAR_SPRITE			= $2fc
-	NUM_VAR_SPRITES			= 12
+	CHAR_TABLE_START 			= $e0
+	NUM_SYM_TABLE_START	 		= $d0
+	CHAR_SPACE					= $ff
+	SCREEN_DATA					= $600
+	NEXT_ROW_CACHE				= $500
+	NEXT_ROW_ATTRS				= $540 ; This could share space with cache if needed.
+	EXTENDED_SPRITE_DATA		= $560
+	LEFT_ATTR_MASK				= %00110011
+	RIGHT_ATTR_MASK				= %11001100
+	SPRITE_DATA					= $200
+	SPRITE_ZERO					= $200
+	PLAYER_SPRITE				= $210
+	PLAYER_BOTTOM_SPRITE		= PLAYER_SPRITE+12
+	PLAYER_SPRITE_ID			= $c6
+	FIRST_VAR_SPRITE			= $230
+	VAR_SPRITE_DATA				= FIRST_VAR_SPRITE
+	LAST_VAR_SPRITE				= $2fc
+	NUM_VAR_SPRITES				= 12
+	CURRENT_LEVEL_DATA			= $400
+	CURRENT_LEVEL_DATA_LENGTH	= $20
 	
 	PLAYER_VELOCITY_NORMAL 		= $01
 	PLAYER_VELOCITY_FAST		= $02
@@ -1763,6 +1766,61 @@ do_sprite_movement:
 	pla
 	sta levelPosition
 	rts
+
+test_sprite_collision:
+	lda PLAYER_SPRITE
+	clc
+	adc #PLAYER_HEIGHT
+	sta temp1 ; player y2
+
+	lda PLAYER_SPRITE+3
+	clc
+	adc #PLAYER_WIDTH
+	sta temp2 ; player x2
+
+	ldx #0
+	@loop:
+		; Logic derived from some code posted by Celius, here: http://forums.nesdev.com/viewtopic.php?t=3743
+		lda VAR_SPRITE_DATA+3, x ; enemyLeftEdge
+		cmp temp2 ; playerRightEdge
+		bcs @continue
+
+		lda VAR_SPRITE_DATA+3, x 
+		clc
+		adc #16 ; TODO: Variable sprite data. enemyRightEdge
+		cmp PLAYER_SPRITE+3 ; playerLeftEdge
+		bcc @continue
+
+		lda VAR_SPRITE_DATA, x ; enemyTopEdge
+		cmp temp1 ; playerBottomEdge
+		bcs @continue
+
+		lda VAR_SPRITE_DATA, x
+		clc
+		adc #16 ; TODO: Variable sprite data. enemyBottomEdge
+		cmp PLAYER_SPRITE ; playerTopEdge
+		bcc @continue
+
+
+		; If you get here, we have collided.
+		txa 
+		lsr
+		tay
+		lda #0
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
+		;sta VAR_SPRITE_DATA, x
+		;sta VAR_SPRITE_DATA+4, x
+		;sta VAR_SPRITE_DATA+8, x
+		;sta VAR_SPRITE_DATA+12, x
+
+		@continue:
+		txa
+		clc
+		adc #16
+		tax
+		cpx #(NUM_VAR_SPRITES*16)
+		bne @loop
+	rts
 	
 handle_main_input: 
 	lda #0
@@ -2247,6 +2305,7 @@ main_loop:
 	jsr do_player_movement
 	jsr do_special_tile_stuff
 	jsr do_sprite_movement
+	jsr test_sprite_collision
 	jsr FamiToneUpdate
 
 	jsr vblank_wait
