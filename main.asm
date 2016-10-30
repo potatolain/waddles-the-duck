@@ -222,7 +222,7 @@ SPRITE_DATA_DIRECTION 	= 5
 SPRITE_DATA_ANIM_STATE	= 5
 SPRITE_DATA_ALIVE		= 4
 SPRITE_DATA_TYPE		= 6
-SPRITE_DATA_CUSTOM		= 7
+SPRITE_DATA_LVL_INDEX	= 7
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -401,6 +401,13 @@ load_level:
 		inx
 		cpx #0
 		bne @loop_desprite
+	ldx #0
+	lda #0
+	@loop_delevel:
+		sta CURRENT_LEVEL_DATA
+		inx
+		cpx #CURRENT_LEVEL_DATA_LENGTH
+		bne @loop_delevel
 
 	lda #DIMENSION_INVALID
 	sta warpDimensionA
@@ -657,12 +664,34 @@ load_current_line:
 
 	; The row **also** has sprites! Maybe!
 	ldy #0
+	ldx #0
 	@loop_sprites:
 		lda (lvlSpriteDataAddr), y
 		cmp #$ff
-		beq @done_sprites
+		bne @not_done_sprites
+			jmp @done_sprites
+		@not_done_sprites:
 		cmp levelPosition
 		bne @move_on
+			store #0, temp1 ; Position of the byte
+			txa
+			pha 
+			lda #%00000001
+			stx temp3 ; Store the original number for later use, before we consume it.
+			@loop_for_mask:
+				asl
+				bcc @not_relooping
+					inc temp1
+					lda #%00000001
+				@not_relooping:
+				dex
+				cpx #255 ; Make sure we actually calculate the 0 run.
+				bne @loop_for_mask
+				; Okay, temp1 is now the index off of CURRENT_LEVEL_DATA, and a is the mask. Sooo...
+				ldx temp1
+				and CURRENT_LEVEL_DATA, x
+				cmp #0
+				bne @move_on_plx
 			lda currentSprite
 			clc 
 			adc #$8
@@ -702,25 +731,32 @@ load_current_line:
 			lda #0
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
-			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_CUSTOM, x
 			; TODO: need a real type - have to look this up from sprite_data. That's going to be... fun...
 			; Then we can draw this stuff as it goes on screen!
 			; For now, everything's a coin...
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 
-
-			lda #0
+			lda temp3
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
 
 			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
 			iny
-			ldx temp5 ; put that thing back where it came from, or so help me.
+			pla
+			tax
+			inx
 			jmp @loop_sprites 
+		@move_on_plx:
+			pla
+			tax
 		@move_on:
 		.repeat 3
 			iny
 		.endrepeat
+		inx
 		jmp @loop_sprites
 	@done_sprites:
+	ldx temp5 ; put that thing back where it came from, or so help me. (Carryover from nametable row fn)
+
 	rts
 	
 ; Draws the tile in a to the next 4 positions in NEXT_ROW_CACHE. 
@@ -1803,15 +1839,43 @@ test_sprite_collision:
 
 
 		; If you get here, we have collided.
-		txa 
+		txa
+		pha 
 		lsr
 		tay
 		lda #0
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
-		;sta VAR_SPRITE_DATA, x
-		;sta VAR_SPRITE_DATA+4, x
-		;sta VAR_SPRITE_DATA+8, x
-		;sta VAR_SPRITE_DATA+12, x
+		
+		; We may not re-run sprite drawing immediately, so get those outta here now.
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+
+		; Also update level data...
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, y
+		tax 
+		store #0, temp0
+		lda #1
+		@loop_indexer:
+			asl
+			bcc @no_reloop
+				inc temp0
+				lda #1
+			@no_reloop:
+			dex
+			cpx #255 ; Make sure we actually calculate the 0 run.
+			bne @loop_indexer
+
+			; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
+		ldx temp0
+		ora CURRENT_LEVEL_DATA, x
+		sta CURRENT_LEVEL_DATA, x
+
+		; restore x to its former glory.
+		pla
+		tax
+		
 
 		@continue:
 		txa
