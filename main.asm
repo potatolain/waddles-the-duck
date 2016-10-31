@@ -26,7 +26,7 @@
 
 		
 .segment "ZEROPAGE"
-	; 6 "scratch" variables for whatever we may be doing at the time. 
+	; Set of "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
 	temp0: 						.res 1
@@ -35,6 +35,8 @@
 	temp3: 						.res 1
 	temp4: 						.res 1
 	temp5:						.res 1
+	temp6:						.res 1
+	temp7:						.res 1
 	tempCollision:				.res 1 ; Yes, this is lame.
 	playerPosition:				.res 2
 	playerScreenPosition:		.res 1
@@ -672,7 +674,9 @@ load_current_line:
 			jmp @done_sprites
 		@not_done_sprites:
 		cmp levelPosition
-		bne @move_on
+		beq @dont_move_on
+			jmp @move_on
+		@dont_move_on:
 			store #0, temp1 ; Position of the byte
 			txa
 			pha 
@@ -691,7 +695,9 @@ load_current_line:
 				ldx temp1
 				and CURRENT_LEVEL_DATA, x
 				cmp #0
-				bne @move_on_plx
+				beq @dun_move_on
+					jmp @move_on_plx
+				@dun_move_on:
 			lda currentSprite
 			clc 
 			adc #$8
@@ -731,11 +737,34 @@ load_current_line:
 			lda #0
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
-			; TODO: need a real type - have to look this up from sprite_data. That's going to be... fun...
-			; Then we can draw this stuff as it goes on screen!
-			; For now, everything's a coin...
+
+			; Get our real type... have to get it off sprite_definitions, which is "fun"
+			lda (lvlSpriteDataAddr), y
+			.repeat 3
+				asl
+			.endrepeat
+			tax
+			stx temp6 ; index off of sprite_data
+			lda sprite_definitions+3, x
+			sta temp7
+			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 
+			ldx temp6
+			lda sprite_definitions+4, x
+			sta temp7
+			
+			; We don't update attributes once they're set, so just set them directly now. 
+			lda currentSprite
+			asl
+			tax
+			lda temp7
+			sta VAR_SPRITE_DATA+2, x
+			sta VAR_SPRITE_DATA+6, x
+			sta VAR_SPRITE_DATA+10, x
+			sta VAR_SPRITE_DATA+14, x
+			
+			ldx currentSprite
 			lda temp3
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
 
@@ -1765,13 +1794,10 @@ do_sprite_movement:
 			sta VAR_SPRITE_DATA+7, y
 			sta VAR_SPRITE_DATA+15, y
 
-			; TODO: Make not every sprite a coin!
-			lda #0
+			; Attrs for sprites set on spawn, then left alone.
+
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 			sta VAR_SPRITE_DATA+1, y
-			sta VAR_SPRITE_DATA+2, y
-			sta VAR_SPRITE_DATA+6, y
-			sta VAR_SPRITE_DATA+10, y
-			sta VAR_SPRITE_DATA+14, y
 			clc
 			adc #1
 			sta VAR_SPRITE_DATA+5, y
@@ -1786,8 +1812,8 @@ do_sprite_movement:
 			asl
 			tax
 			lda #SPRITE_OFFSCREEN
-			.repeat 16, I
-				sta VAR_SPRITE_DATA+I, x
+			.repeat 4, I
+				sta VAR_SPRITE_DATA+(I*4), x
 			.endrepeat
 			; fallthru to continue
 		@continue:
@@ -2581,7 +2607,7 @@ fire_palettes:
 	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$3d,$00,$30
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
-	.byte $31,$27,$38,$0f,$31,$00,$10,$31,$31,$01,$21,$31,$31,$09,$19,$29
+	.byte $31,$27,$38,$0f,$31,$06,$16,$1a,$31,$01,$21,$31,$31,$09,$19,$29
 
 menu_palettes: 
 	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
