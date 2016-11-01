@@ -20,9 +20,10 @@
 ; $400-41f: Current level data.
 ; $420-4ff: Unused (Reserved: static collectible data)
 ; $500-55f: Screen buffer
-; $560-5ff: Extended sprite data
+; $560-5ff: Unused
 ; $600-6ff: Map data
-; $700-7ff: Unused
+; $700-7bf: Extended sprite data
+; $7c0-7ff: Unused
 
 		
 .segment "ZEROPAGE"
@@ -82,7 +83,7 @@
 	SCREEN_DATA					= $600
 	NEXT_ROW_CACHE				= $500
 	NEXT_ROW_ATTRS				= $540 ; This could share space with cache if needed.
-	EXTENDED_SPRITE_DATA		= $560
+	EXTENDED_SPRITE_DATA		= $700
 	LEFT_ATTR_MASK				= %00110011
 	RIGHT_ATTR_MASK				= %11001100
 	SPRITE_DATA					= $200
@@ -397,13 +398,13 @@ load_level:
 	sta playerIsInScrollMargin
 
 	lda #SPRITE_OFFSCREEN
-	ldx #<(EXTENDED_SPRITE_DATA)
+	ldx #0
 	@loop_desprite:
 		sta EXTENDED_SPRITE_DATA, x
 		inx
 		cpx #0
 		bne @loop_desprite
-	ldx #0
+	; ldx #0 ; Implied.
 	lda #0
 	@loop_delevel:
 		sta CURRENT_LEVEL_DATA
@@ -700,9 +701,9 @@ load_current_line:
 				@dun_move_on:
 			lda currentSprite
 			clc 
-			adc #$8
+			adc #$10
 			sta currentSprite
-			cmp #(NUM_VAR_SPRITES*8)
+			cmp #(NUM_VAR_SPRITES*16)
 			bne @okay
 				; oh noes, we looped! Go back to square 1.
 				lda #0
@@ -740,7 +741,7 @@ load_current_line:
 
 			; Get our real type... have to get it off sprite_definitions, which is "fun"
 			lda (lvlSpriteDataAddr), y
-			.repeat 3
+			.repeat 4
 				asl
 			.endrepeat
 			tax
@@ -755,9 +756,7 @@ load_current_line:
 			sta temp7
 			
 			; We don't update attributes once they're set, so just set them directly now. 
-			lda currentSprite
-			asl
-			tax
+			ldx currentSprite
 			lda temp7
 			sta VAR_SPRITE_DATA+2, x
 			sta VAR_SPRITE_DATA+6, x
@@ -1758,7 +1757,7 @@ do_sprite_movement:
 	@loop:
 		txa
 		pha
-		.repeat 3
+		.repeat 4
 			asl
 		.endrepeat
 		tax
@@ -1772,45 +1771,39 @@ do_sprite_movement:
 		sbc tempAddr+1
 		cmp #0
 		bne @remove
-			txa
-			asl ; each sprite has up to 4 subsprites. So, go from base 8 to base 16
-			tay
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			cmp #0 ; Last chance, GET OUT
 			beq @remove
-			sta VAR_SPRITE_DATA, y
-			sta VAR_SPRITE_DATA+4, y
+			sta VAR_SPRITE_DATA, x
+			sta VAR_SPRITE_DATA+4, x
 			clc
 			adc #8
-			sta VAR_SPRITE_DATA+8, y
-			sta VAR_SPRITE_DATA+12, y
+			sta VAR_SPRITE_DATA+8, x
+			sta VAR_SPRITE_DATA+12, x
 			lda temp1
 			sec
 			sbc temp2
-			sta VAR_SPRITE_DATA+3, y
-			sta VAR_SPRITE_DATA+11, y
+			sta VAR_SPRITE_DATA+3, x
+			sta VAR_SPRITE_DATA+11, x
 			clc
 			adc #8
-			sta VAR_SPRITE_DATA+7, y
-			sta VAR_SPRITE_DATA+15, y
+			sta VAR_SPRITE_DATA+7, x
+			sta VAR_SPRITE_DATA+15, x
 
 			; Attrs for sprites set on spawn, then left alone.
 
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
-			sta VAR_SPRITE_DATA+1, y
+			sta VAR_SPRITE_DATA+1, x
 			clc
 			adc #1
-			sta VAR_SPRITE_DATA+5, y
+			sta VAR_SPRITE_DATA+5, x
 			clc
 			adc #$f
-			sta VAR_SPRITE_DATA+9, y
+			sta VAR_SPRITE_DATA+9, x
 			adc #1
-			sta VAR_SPRITE_DATA+13, y
+			sta VAR_SPRITE_DATA+13, x
 			jmp @continue
 		@remove: 
-			txa
-			asl
-			tax
 			lda #SPRITE_OFFSCREEN
 			.repeat 4, I
 				sta VAR_SPRITE_DATA+(I*4), x
@@ -1865,12 +1858,9 @@ test_sprite_collision:
 
 
 		; If you get here, we have collided.
-		txa
-		pha 
-		lsr
-		tay
+		; FIXME: x and y now line up because 16-based.
 		lda #0
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 		
 		; We may not re-run sprite drawing immediately, so get those outta here now.
 		sta VAR_SPRITE_DATA, x
@@ -1879,8 +1869,8 @@ test_sprite_collision:
 		sta VAR_SPRITE_DATA+12, x
 
 		; Also update level data...
-		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, y
-		tax 
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
+		tay
 		store #0, temp0
 		lda #1
 		@loop_indexer:
@@ -1889,18 +1879,14 @@ test_sprite_collision:
 				inc temp0
 				lda #1
 			@no_reloop:
-			dex
-			cpx #255 ; Make sure we actually calculate the 0 run.
+			dey
+			cpy #255 ; Make sure we actually calculate the 0 run.
 			bne @loop_indexer
 
 			; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
-		ldx temp0
-		ora CURRENT_LEVEL_DATA, x
-		sta CURRENT_LEVEL_DATA, x
-
-		; restore x to its former glory.
-		pla
-		tax
+		ldy temp0
+		ora CURRENT_LEVEL_DATA, y
+		sta CURRENT_LEVEL_DATA, y
 		
 
 		@continue:
