@@ -226,6 +226,9 @@ SPRITE_DATA_ANIM_STATE	= 5
 SPRITE_DATA_ALIVE		= 4
 SPRITE_DATA_TYPE		= 6
 SPRITE_DATA_LVL_INDEX	= 7
+SPRITE_DATA_WIDTH		= 8
+SPRITE_DATA_HEIGHT		= 9
+SPRITE_DATA_SIZE		= 10
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -746,13 +749,14 @@ load_current_line:
 			.endrepeat
 			tax
 			stx temp6 ; index off of sprite_data
-			lda sprite_definitions+3, x
+			lda sprite_definitions+5, x
 			sta temp7
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 
+			; Palette
 			ldx temp6
-			lda sprite_definitions+4, x
+			lda sprite_definitions+6, x
 			sta temp7
 			
 			; We don't update attributes once they're set, so just set them directly now. 
@@ -766,6 +770,25 @@ load_current_line:
 			ldx currentSprite
 			lda temp3
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
+
+			ldx temp6
+			lda sprite_definitions+1, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x 
+
+			ldx temp6
+			lda sprite_definitions+2, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x 
+
+			ldx temp6
+			lda sprite_definitions+3, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SIZE, x 
+
 
 			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
 			iny
@@ -1774,35 +1797,25 @@ do_sprite_movement:
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			cmp #0 ; Last chance, GET OUT
 			beq @remove
-			sta VAR_SPRITE_DATA, x
-			sta VAR_SPRITE_DATA+4, x
-			clc
-			adc #8
-			sta VAR_SPRITE_DATA+8, x
-			sta VAR_SPRITE_DATA+12, x
-			lda temp1
-			sec
-			sbc temp2
-			sta VAR_SPRITE_DATA+3, x
-			sta VAR_SPRITE_DATA+11, x
-			clc
-			adc #8
-			sta VAR_SPRITE_DATA+7, x
-			sta VAR_SPRITE_DATA+15, x
 
-			; Attrs for sprites set on spawn, then left alone.
-
-			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
-			sta VAR_SPRITE_DATA+1, x
-			clc
-			adc #1
-			sta VAR_SPRITE_DATA+5, x
-			clc
-			adc #$f
-			sta VAR_SPRITE_DATA+9, x
-			adc #1
-			sta VAR_SPRITE_DATA+13, x
-			jmp @continue
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_SIZE, x
+			cmp #SPRITE_SIZE_DEFAULT
+			bne @not_default
+				jsr draw_default_sprite_size
+				jmp @continue
+			@not_default:
+			cmp #SPRITE_SIZE_2X1
+			bne @not_2x1
+				jsr draw_2x1_sprite_size
+				jmp @continue
+			@not_2x1:
+			cmp #SPRITE_SIZE_3X1
+			bne @not_3x1
+				jsr draw_2x1_sprite_size
+				jmp @continue
+			@not_3x1:
+				jsr draw_default_sprite_size
+				jmp @continue
 		@remove: 
 			lda #SPRITE_OFFSCREEN
 			.repeat 4, I
@@ -1842,7 +1855,7 @@ test_sprite_collision:
 
 		lda VAR_SPRITE_DATA+3, x 
 		clc
-		adc #16 ; TODO: Variable sprite data. enemyRightEdge
+		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x ; enemyRightEdge
 		cmp PLAYER_SPRITE+3 ; playerLeftEdge
 		bcc @continue
 
@@ -1852,7 +1865,7 @@ test_sprite_collision:
 
 		lda VAR_SPRITE_DATA, x
 		clc
-		adc #16 ; TODO: Variable sprite data. enemyBottomEdge
+		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x ; enemyBottomEdge
 		cmp PLAYER_SPRITE ; playerTopEdge
 		bcc @continue
 
@@ -1897,6 +1910,69 @@ test_sprite_collision:
 		cpx #(NUM_VAR_SPRITES*16)
 		bne @loop
 	rts
+
+draw_2x1_sprite_size: 
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	clc
+	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
+	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA+4, x
+
+	lda #SPRITE_OFFSCREEN
+	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA+12, x
+	
+	lda temp1
+	sec
+	sbc temp2
+	sta VAR_SPRITE_DATA+3, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+
+	; Attrs for sprites set on spawn, then left alone.
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	sta VAR_SPRITE_DATA+1, x
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+5, x
+
+	rts
+
+draw_default_sprite_size:
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA+4, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA+12, x
+	lda temp1
+	sec
+	sbc temp2
+	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+11, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+	sta VAR_SPRITE_DATA+15, x
+
+	; Attrs for sprites set on spawn, then left alone.
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	sta VAR_SPRITE_DATA+1, x
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+5, x
+	clc
+	adc #$f
+	sta VAR_SPRITE_DATA+9, x
+	adc #1
+	sta VAR_SPRITE_DATA+13, x
+
+	rts
+
 	
 handle_main_input: 
 	lda #0
