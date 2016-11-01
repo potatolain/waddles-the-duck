@@ -169,6 +169,8 @@
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
 
+	; How many frames the player goes up before going down if dying to an enemy.
+	DEATH_HOP_TIME			= 6
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -1987,6 +1989,60 @@ do_sprite_collision:
 do_player_death:
 	lda #1
 	jsr FamiToneMusicPause
+
+	lda PLAYER_SPRITE+12
+	clc
+	adc #PLAYER_VELOCITY_FALLING
+	adc #10
+	bcs @dead
+
+	ldx #0 ; bounce up a wee bit before falling to your doom...
+	@fallup:
+		lda PLAYER_SPRITE+12
+		sec
+		sbc #PLAYER_VELOCITY_FALLING
+		sta PLAYER_SPRITE+12
+		sta PLAYER_SPRITE+16
+		sta PLAYER_SPRITE+20
+		sec
+		sbc #8
+		sta PLAYER_SPRITE
+		sta PLAYER_SPRITE+4
+		sta PLAYER_SPRITE+8
+
+		txa
+		pha
+		jsr vblank_wait
+		jsr do_sprite0
+		jsr FamiToneUpdate
+		pla
+		tax
+		inx
+		cpx #DEATH_HOP_TIME
+		bne @fallup
+
+
+	@falldown_goboom:
+		lda PLAYER_SPRITE+12
+		clc
+		adc #PLAYER_VELOCITY_FALLING
+		bcc @not_dead_yet
+			jmp @dead
+		@not_dead_yet:
+		sta PLAYER_SPRITE+12
+		sta PLAYER_SPRITE+16
+		sta PLAYER_SPRITE+20
+		sec
+		sbc #8
+		sta PLAYER_SPRITE
+		sta PLAYER_SPRITE+4
+		sta PLAYER_SPRITE+8
+
+		jsr vblank_wait
+		jsr do_sprite0
+		jsr FamiToneUpdate
+		jmp @falldown_goboom
+	@dead:
 	ldx #$ff
 	txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
 	jmp show_ready ; FIXME: Probably should have something else happen on death.
