@@ -224,7 +224,7 @@ SPRITE_DATA_ID			= 3
 SPRITE_DATA_DIRECTION 	= 5
 SPRITE_DATA_ANIM_STATE	= 5
 SPRITE_DATA_ALIVE		= 4
-SPRITE_DATA_TYPE		= 6
+SPRITE_DATA_TILE_ID		= 6
 SPRITE_DATA_LVL_INDEX	= 7
 SPRITE_DATA_WIDTH		= 8
 SPRITE_DATA_HEIGHT		= 9
@@ -752,7 +752,7 @@ load_current_line:
 			lda sprite_definitions+5, x
 			sta temp7
 			ldx currentSprite
-			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 
 			; Palette
 			ldx temp6
@@ -1430,11 +1430,7 @@ do_player_vertical_movement:
 		adc playerYVelocity
 		cmp #SPRITE_OFFSCREEN
 		bcc @not_uhoh
-			lda #1
-			jsr FamiToneMusicPause
-			ldx #$ff
-			txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
-			jmp show_ready ; FIXME: Probably should have something else happen on death.
+			jsr do_player_death
 		@not_uhoh:
 		sta PLAYER_SPRITE
 		sta PLAYER_SPRITE+4
@@ -1869,38 +1865,7 @@ test_sprite_collision:
 		cmp PLAYER_SPRITE ; playerTopEdge
 		bcc @continue
 
-
-		; If you get here, we have collided.
-		; FIXME: x and y now line up because 16-based.
-		lda #0
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
-		
-		; We may not re-run sprite drawing immediately, so get those outta here now.
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
-
-		; Also update level data...
-		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
-		tay
-		store #0, temp0
-		lda #1
-		@loop_indexer:
-			asl
-			bcc @no_reloop
-				inc temp0
-				lda #1
-			@no_reloop:
-			dey
-			cpy #255 ; Make sure we actually calculate the 0 run.
-			bne @loop_indexer
-
-			; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
-		ldy temp0
-		ora CURRENT_LEVEL_DATA, y
-		sta CURRENT_LEVEL_DATA, y
-		
+		jsr do_sprite_collision
 
 		@continue:
 		txa
@@ -1932,7 +1897,7 @@ draw_2x1_sprite_size:
 
 	; Attrs for sprites set on spawn, then left alone.
 
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	sta VAR_SPRITE_DATA+1, x
 	clc
 	adc #1
@@ -1960,7 +1925,7 @@ draw_default_sprite_size:
 
 	; Attrs for sprites set on spawn, then left alone.
 
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	sta VAR_SPRITE_DATA+1, x
 	clc
 	adc #1
@@ -1971,6 +1936,92 @@ draw_default_sprite_size:
 	adc #1
 	sta VAR_SPRITE_DATA+13, x
 
+	rts
+
+; You hit. What're we gonna do to you?
+do_sprite_collision: 
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
+	.repeat 3
+		asl
+	.endrepeat
+	tay
+	lda sprite_definitions, y
+	cmp #SPRITE_TYPE_COLLECTIBLE
+	bne @not_collectible
+
+		jsr remove_sprite		
+		; Ding dong?
+		txa
+		pha
+		lda #SFX_COIN
+		ldx #FT_SFX_CH0
+		jsr FamiToneSfxPlay
+		pla
+		tax
+		rts
+	@not_collectible:
+	cmp #SPRITE_TYPE_JUMPABLE_ENEMY
+	bne @not_jumpable
+		lda PLAYER_SPRITE
+		sec
+		sbc playerYVelocity ; put you back where you were last frame for comparison.
+		clc
+		adc #PLAYER_HEIGHT
+		sta temp6
+		lda VAR_SPRITE_DATA, x
+		cmp temp6
+		bcs @above
+			jmp do_player_death						
+		@above:
+			jsr remove_sprite
+		
+		rts
+	@not_jumpable:
+	cmp #SPRITE_TYPE_INVULN_ENEMY
+	bne @not_invuln
+		jmp do_player_death
+	@not_invuln:
+
+	rts
+
+do_player_death:
+	lda #1
+	jsr FamiToneMusicPause
+	ldx #$ff
+	txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
+	jmp show_ready ; FIXME: Probably should have something else happen on death.
+
+; Remove a sprite at position x (16-based) entirely from existance.
+remove_sprite:
+	; If you get here, we have collided.
+	lda #0
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	
+	; We may not re-run sprite drawing immediately, so get those outta here now.
+	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA+12, x
+
+	; Also update level data...
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
+	tay
+	store #0, temp0
+	lda #1
+	@loop_indexer:
+		asl
+		bcc @no_reloop
+			inc temp0
+			lda #1
+		@no_reloop:
+		dey
+		cpy #255 ; Make sure we actually calculate the 0 run.
+		bne @loop_indexer
+
+		; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
+	ldy temp0
+	ora CURRENT_LEVEL_DATA, y
+	sta CURRENT_LEVEL_DATA, y
 	rts
 
 	
