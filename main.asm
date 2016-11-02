@@ -231,6 +231,7 @@ SPRITE_DATA_LVL_INDEX	= 7
 SPRITE_DATA_WIDTH		= 8
 SPRITE_DATA_HEIGHT		= 9
 SPRITE_DATA_SIZE		= 10
+SPRITE_DATA_ANIM_TYPE	= 11
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -742,6 +743,7 @@ load_current_line:
 			
 			lda #0
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
+			lda #SPRITE_DIRECTION_LEFT
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
 
 			; Get our real type... have to get it off sprite_definitions, which is "fun"
@@ -789,7 +791,13 @@ load_current_line:
 			lda sprite_definitions+3, x
 			sta temp7
 			ldx currentSprite
-			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SIZE, x 
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SIZE, x
+
+			ldx temp6
+			lda sprite_definitions+4, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x 
 
 
 			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
@@ -1752,12 +1760,6 @@ do_sprite_movement:
 		asl tempAddr
 		rol tempAddr+1
 	.endrepeat
-	
-	lda xScrollChange
-	cmp #0
-	bne @undone
-		jmp @done
-	@undone:
 
 	lda scrollX
 	and #%00001111
@@ -1792,6 +1794,36 @@ do_sprite_movement:
 		sbc tempAddr+1
 		cmp #0
 		bne @remove
+
+
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
+			cmp #SPRITE_ANIMATION_NONE
+			bne @not_no_anim
+				lda #0
+				sta temp6
+				sta temp7
+				jmp @after_anim
+			@not_no_anim:
+			cmp #SPRITE_ANIMATION_NORMAL
+			bne @not_normal
+				lda frameCounter
+				and #%00001000
+				lsr
+				lsr
+				lsr
+				sta temp6
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+				and #SPRITE_DATA_DIRECTION_MASK
+				; 0010,0000
+				.repeat 5
+					lsr ; make it a multiple of 8
+				.endrepeat
+				sta temp7
+				; Intentional fallthru
+			@not_normal:
+			@after_anim:
+
+
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			cmp #0 ; Last chance, GET OUT
 			beq @remove
@@ -1814,6 +1846,7 @@ do_sprite_movement:
 			@not_3x1:
 				jsr draw_default_sprite_size
 				jmp @continue
+
 		@remove: 
 			lda #SPRITE_OFFSCREEN
 			.repeat 4, I
@@ -1878,7 +1911,18 @@ test_sprite_collision:
 		bne @loop
 	rts
 
+; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_2x1_sprite_size: 
+	lda temp6
+	.repeat 4
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	asl
+	clc
+	adc temp6
+	sta temp6
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	clc
 	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
@@ -1900,6 +1944,8 @@ draw_2x1_sprite_size:
 	; Attrs for sprites set on spawn, then left alone.
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
 	sta VAR_SPRITE_DATA+1, x
 	clc
 	adc #1
@@ -1908,6 +1954,17 @@ draw_2x1_sprite_size:
 	rts
 
 draw_default_sprite_size:
+	lda temp6
+	.repeat 5
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	asl
+	clc
+	adc temp6
+	sta temp6
+
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	sta VAR_SPRITE_DATA, x
 	sta VAR_SPRITE_DATA+4, x
@@ -1928,6 +1985,8 @@ draw_default_sprite_size:
 	; Attrs for sprites set on spawn, then left alone.
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
 	sta VAR_SPRITE_DATA+1, x
 	clc
 	adc #1
