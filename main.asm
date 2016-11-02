@@ -747,8 +747,8 @@ load_current_line:
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
 
 			; Get our real type... have to get it off sprite_definitions, which is "fun"
-			lda (lvlSpriteDataAddr), y
-			.repeat 4
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
+			.repeat 3
 				asl
 			.endrepeat
 			tax
@@ -1841,7 +1841,7 @@ do_sprite_movement:
 			@not_2x1:
 			cmp #SPRITE_SIZE_3X1
 			bne @not_3x1
-				jsr draw_2x1_sprite_size
+				jsr draw_3x1_sprite_size
 				jmp @continue
 			@not_3x1:
 				jsr draw_default_sprite_size
@@ -1952,6 +1952,57 @@ draw_2x1_sprite_size:
 	sta VAR_SPRITE_DATA+5, x
 
 	rts
+
+; x must be a sprite id, temp6 is animation, temp7 is direction
+draw_3x1_sprite_size: 
+	lda temp6
+	.repeat 4
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	clc
+	adc temp7 
+	adc temp7 ; Multiply by 3.
+	
+	adc temp6
+	sta temp6
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	clc
+	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
+	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA+8, x
+
+	lda #SPRITE_OFFSCREEN
+	sta VAR_SPRITE_DATA+12, x
+	
+	lda temp1
+	sec
+	sbc temp2
+	sta VAR_SPRITE_DATA+3, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+11, x
+
+	; Attrs for sprites set on spawn, then left alone.
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
+	sta VAR_SPRITE_DATA+1, x
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+5, x
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+9, x
+
+	rts
+
 
 draw_default_sprite_size:
 	lda temp6
