@@ -174,6 +174,7 @@
 
 	; How many frames the player goes up before going down if dying to an enemy.
 	DEATH_HOP_TIME			= 6
+	DEATH_SONG_TIME			= 64
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -185,11 +186,14 @@
 	SFX_CHIRP 	= 4
 	SFX_MENU	= 5
 	SFX_WARP	= 7
+	SFX_SQUISH	= 9
+	SFX_HURT	= 8
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
 	SONG_CRAPPY 		= 0
 	SONG_ICE_CRAPPY 	= 1
+	SONG_DEATH			= 3
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -400,11 +404,15 @@ load_graphics_data:
 load_level: 
 	lda #$20
 	sta playerPosition
+	sta tempPlayerPosition
 	sta playerScreenPosition
+	sta tempPlayerScreenPosition
 	lda #0
 	sta playerPosition+1
+	sta tempPlayerPosition+1
 	lda #1
 	sta playerIsInScrollMargin
+	jsr seed_level_position_l
 
 	lda #SPRITE_OFFSCREEN
 	ldx #0
@@ -2118,8 +2126,15 @@ do_sprite_collision:
 	rts
 
 do_player_death:
-	lda #1
-	jsr FamiToneMusicPause
+	txa
+	pha
+	lda #SFX_HURT
+	ldx #FT_SFX_CH1
+	jsr FamiToneSfxPlay
+	lda #SONG_DEATH
+	jsr FamiToneMusicPlay
+	pla
+	tax
 
 	lda PLAYER_SPRITE+12
 	clc
@@ -2174,6 +2189,18 @@ do_player_death:
 		jsr FamiToneUpdate
 		jmp @falldown_goboom
 	@dead:
+	ldx #00
+	@loop_snd:
+		txa
+		pha
+		jsr vblank_wait
+		jsr do_sprite0
+		jsr FamiToneUpdate
+		pla
+		tax
+		inx
+		cpx #DEATH_SONG_TIME
+		bne @loop_snd
 	ldx #$ff
 	txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
 	jmp show_ready ; FIXME: Probably should have something else happen on death.
@@ -2225,6 +2252,14 @@ squish_sprite:
 	@not_3x1: 
 
 	@after_tests:
+
+	txa
+	pha
+	lda #SFX_SQUISH
+	ldx #FT_SFX_CH1
+	jsr FamiToneSfxPlay
+	pla
+	tax
 
 	pla
 	tay
@@ -2798,6 +2833,25 @@ main_loop:
 
 
 	jmp main_loop
+
+clear_sprites:
+	ldx #0
+	lda #SPRITE_OFFSCREEN
+	@loop:
+		sta SPRITE_DATA, x
+		inx
+		cpx #0
+		bne @loop
+
+	; WARNING: This clears everything in the page sprite data is in. This may have side effects!
+	ldx #0
+	lda #0
+	@loop_data:
+		sta EXTENDED_SPRITE_DATA, x
+		inx
+		cpx #0
+		bne @loop_data
+	rts
 	
 show_level: 
 	jsr disable_all
@@ -2808,9 +2862,10 @@ show_level:
 	and #%11111000 ; set to nametable 0
 	sta PPU_CTRL
 	sta ppuCtrlBuffer
-	
-	jsr load_graphics_data
+
 	jsr load_level
+	jsr clear_sprites
+	jsr load_graphics_data
 	jsr draw_switchable_tiles
 	jsr load_palettes_for_dimension
 
