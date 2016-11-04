@@ -153,6 +153,7 @@
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
 	SPRITE_SCREEN_OFFSET	= 16
+	MAX_SPRITE_REMOVAL_TIME	= 45
 	
 	SPRITE_OFFSCREEN 		= $ef
 
@@ -165,6 +166,8 @@
 	TILE_ICE_BLOCK			= 27
 
 	TILE_LEVEL_END			= 51
+
+	SPRITE_DYING			= $0c
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
@@ -1804,6 +1807,20 @@ do_sprite_movement:
 				sta temp7
 				jmp @after_anim
 			@not_no_anim:
+			cmp #SPRITE_ANIMATION_DYING
+			bne @not_dying
+				inc EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
+				cmp #MAX_SPRITE_REMOVAL_TIME
+				bne @not_dead_yet
+					jsr remove_sprite
+					jmp @remove
+				@not_dead_yet:
+				lda #0
+				sta temp6
+				sta temp7
+				jmp @after_anim
+			@not_dying:
 			cmp #SPRITE_ANIMATION_NORMAL
 			bne @not_normal
 				lda frameCounter
@@ -1879,6 +1896,10 @@ test_sprite_collision:
 
 	ldx #0
 	@loop:
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
+		cmp #SPRITE_ANIMATION_DYING
+		beq @continue ; No collisions for the dying...
+
 		; Logic derived from some code posted by Celius, here: http://forums.nesdev.com/viewtopic.php?t=3743
 		lda VAR_SPRITE_DATA+3, x ; enemyLeftEdge
 		cmp temp2 ; playerRightEdge
@@ -2085,7 +2106,7 @@ do_sprite_collision:
 		bcs @above
 			jmp do_player_death						
 		@above:
-			jsr remove_sprite
+			jsr squish_sprite
 		
 		rts
 	@not_jumpable:
@@ -2156,6 +2177,58 @@ do_player_death:
 	ldx #$ff
 	txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
 	jmp show_ready ; FIXME: Probably should have something else happen on death.
+
+; Start squish animation for a sprite at position x
+squish_sprite:
+	tya
+	pha
+	lda #SPRITE_ANIMATION_DYING
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
+
+	lda #SPRITE_DYING
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
+	.repeat 3
+		asl
+	.endrepeat
+	tay
+	lda sprite_definitions+3, y
+	cmp #SPRITE_SIZE_DEFAULT
+	bne @not_default
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+
+		lda #SPRITE_DYING
+		sta VAR_SPRITE_DATA+9, x
+		lda #SPRITE_DYING+1
+		sta VAR_SPRITE_DATA+13, x
+		jmp @after_tests
+	@not_default:
+	cmp #SPRITE_SIZE_2X1
+	bne @not_2x1
+		lda #SPRITE_DYING
+		sta VAR_SPRITE_DATA+1, x
+		lda #SPRITE_DYING+1
+		sta VAR_SPRITE_DATA+5, x
+		jmp @after_tests
+	@not_2x1:
+	cmp #SPRITE_SIZE_3X1
+	bne @not_3x1
+		lda #SPRITE_DYING
+		sta VAR_SPRITE_DATA+1
+		sta VAR_SPRITE_DATA+9
+		lda #SPRITE_DYING+1
+		sta VAR_SPRITE_DATA+5
+		; jmp @after_tests
+	@not_3x1: 
+
+	@after_tests:
+
+	pla
+	tay
+	rts
 
 ; Remove a sprite at position x (16-based) entirely from existance.
 remove_sprite:
