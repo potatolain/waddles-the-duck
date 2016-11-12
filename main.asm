@@ -27,6 +27,7 @@
 
 		
 .segment "ZEROPAGE"
+	watchme: 					.res 1
 	; Set of "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
@@ -239,6 +240,7 @@ SPRITE_DATA_WIDTH		= 8
 SPRITE_DATA_HEIGHT		= 9
 SPRITE_DATA_SIZE		= 10
 SPRITE_DATA_ANIM_TYPE	= 11
+SPRITE_DATA_TYPE		= 12
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -810,6 +812,12 @@ load_current_line:
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x 
 
+			ldx temp6
+			lda sprite_definitions+0, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+
 
 			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
 			iny
@@ -1182,7 +1190,7 @@ test_vertical_collision:
 
 		lda PLAYER_BOTTOM_SPRITE
 		clc
-		adc #7
+		adc #7 ; sprite width
 		clc
 		adc playerYVelocity
 		sec
@@ -1793,8 +1801,8 @@ do_sprite_movement:
 		pha
 		.repeat 4
 			asl
-		.endrepeat
-		tax
+			.endrepeat
+			tax 
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sec
 		sbc #SPRITE_SCREEN_OFFSET+1
@@ -3017,7 +3025,7 @@ default_sprite_palettes: ; Drawn at same time as above.
 	.byte $31,$27,$38,$0f,$31,$06,$16,$1a,$31,$01,$21,$31,$31,$09,$19,$29
 
 menu_palettes: 
-	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
+	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
 	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
 
 	
