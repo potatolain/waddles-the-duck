@@ -78,6 +78,7 @@
 	paletteAddr:				.res 2
 	currentSprite:				.res 1
 	xScrollChange:				.res 1
+	duckPausePosition:			.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -171,6 +172,7 @@
 	TILE_LEVEL_END			= 51
 
 	SPRITE_DYING			= $0c
+	SPRITE_PAUSE_LETTERS	= $e0
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
@@ -182,15 +184,16 @@
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Sound Effect ids
-	SFX_COIN	= 1
-	SFX_FLAP	= 0
-	SFX_JUMP	= 2
-	SFX_DUCK 	= 3
-	SFX_CHIRP 	= 4
-	SFX_MENU	= 5
-	SFX_WARP	= 7
-	SFX_SQUISH	= 9
-	SFX_HURT	= 8
+	SFX_COIN		= 1
+	SFX_FLAP		= 0
+	SFX_JUMP		= 2
+	SFX_DUCK 		= 3
+	SFX_CHIRP 		= 4
+	SFX_MENU		= 5
+	SFX_WARP		= 7
+	SFX_SQUISH		= 9
+	SFX_HURT		= 8
+	SFX_MENU_DOWN	= 10
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -299,7 +302,14 @@ clear_memory:
 	sta	$0500, x
 	sta	$0600, x
 	sta	$0700, x
-	lda	#$ff
+	txa
+	and #%00000011
+	beq  @its_y
+		lda #0
+		jmp @doit
+	@its_y: 
+		lda #SPRITE_OFFSCREEN
+	@doit: 
 	sta	$0200, x	; move all sprites off screen
 	inx
 	bne	clear_memory
@@ -422,7 +432,11 @@ load_level:
 	ldx #0
 	@loop_desprite:
 		sta EXTENDED_SPRITE_DATA, x
-		inx
+		sta EXTENDED_SPRITE_DATA+1, x
+		txa
+		clc
+		adc #16
+		tax
 		cpx #0
 		bne @loop_desprite
 	; ldx #0 ; Implied.
@@ -2332,7 +2346,8 @@ handle_main_input:
 	cmp #0
 	beq @not_locked
 		dec playerVelocityLockTime
-		rts ; TODO: Once we have a pause button, others, allow them here.
+		jsr read_controller
+		jmp @locked_allowed_buttons
 	@not_locked:
 	lda #0
 	sta playerVelocity
@@ -2435,6 +2450,16 @@ handle_main_input:
 	
 	@no_yvelocity:
 
+	@locked_allowed_buttons:
+	lda ctrlButtons
+	and #CONTROLLER_START
+	beq @done_start
+		lda lastCtrlButtons
+		and #CONTROLLER_START
+		bne @done_start
+		jsr do_pause_screen
+	@done_start:
+
 	lda ctrlButtons
 	and #CONTROLLER_SELECT
 	beq @done_sel
@@ -2531,6 +2556,64 @@ load_palettes_for_dimension:
 	pla
 	tax	 
 	rts
+
+load_palettes_for_pause:
+	ldx #0
+	set_ppu_addr $3f00
+	lda #$0f
+	@loop:
+		sta PPU_DATA
+		inx
+		cpx #16 ; get the sprite palettes too; except the last one.
+		bne @loop
+		.repeat 4
+			lda #$0f
+			sta PPU_DATA
+			lda #$00
+			sta PPU_DATA
+			lda #$38
+			sta PPU_DATA
+			lda #$0f
+			sta PPU_DATA
+		.endrepeat 
+
+	rts
+
+load_sprite_palettes:
+	ldx #0
+	set_ppu_addr $3f10
+	@loop:
+		lda default_sprite_palettes, x
+		sta PPU_DATA
+		inx
+		cpx #16
+		bne @loop
+
+	rts
+
+hide_duck: 
+	lda PLAYER_SPRITE
+	sta duckPausePosition
+	lda #SPRITE_OFFSCREEN
+	.repeat 6, I
+		sta PLAYER_SPRITE+(I*4)
+	.endrepeat
+	rts
+
+restore_duck:
+	lda duckPausePosition
+	sta PLAYER_SPRITE
+	sta PLAYER_SPRITE+4
+	sta PLAYER_SPRITE+8
+	lda duckPausePosition
+	clc
+	adc #$8
+	sta PLAYER_SPRITE+12
+	sta PLAYER_SPRITE+16
+	sta PLAYER_SPRITE+20
+	rts
+
+		
 
 play_music_for_dimension: 
 	lda currentDimension
@@ -2874,6 +2957,9 @@ clear_sprites:
 	@loop:
 		sta SPRITE_DATA, x
 		inx
+		inx
+		inx
+		inx
 		cpx #0
 		bne @loop
 
@@ -2885,6 +2971,13 @@ clear_sprites:
 		inx
 		cpx #0
 		bne @loop_data
+	rts
+
+clear_var_sprites:
+	lda #SPRITE_OFFSCREEN
+	.repeat NUM_VAR_SPRITES*4, I
+		sta VAR_SPRITE_DATA+(I*4)
+	.endrepeat
 	rts
 	
 show_level: 
@@ -2935,6 +3028,93 @@ show_level:
 	jsr play_music_for_dimension
 	
 	jmp main_loop
+
+
+do_pause_screen:
+	lda ppuCtrlBuffer
+	and #%11111011
+	sta ppuCtrlBuffer
+
+	jsr disable_all
+	jsr vblank_wait
+	jsr load_palettes_for_pause
+	jsr clear_var_sprites
+	jsr hide_duck
+	jsr enable_all
+
+	store #SPRITE_PAUSE_LETTERS, VAR_SPRITE_DATA+1
+	store #SPRITE_PAUSE_LETTERS+1, VAR_SPRITE_DATA+5
+	store #SPRITE_PAUSE_LETTERS+$10, VAR_SPRITE_DATA+9
+	store #SPRITE_PAUSE_LETTERS+$11, VAR_SPRITE_DATA+13
+	store #SPRITE_PAUSE_LETTERS+2, VAR_SPRITE_DATA+17
+	store #SPRITE_PAUSE_LETTERS+3, VAR_SPRITE_DATA+21
+
+	lda #SPRITE_PAUSE_LETTERS+$12
+	sta VAR_SPRITE_DATA+25
+	sta VAR_SPRITE_DATA+29
+
+	; Don't touch palettes here - most sprites should have a non-duck color, meaning we can rely on them.
+
+	lda #$60
+	.repeat 8, I
+		sta VAR_SPRITE_DATA+(I*4)
+	.endrepeat
+
+	lda #$60
+	.repeat 6, I
+		sta VAR_SPRITE_DATA+(I*4)+3
+		adc #8
+	.endrepeat
+	adc #8
+	sta VAR_SPRITE_DATA+31
+	lda #$50
+	sta VAR_SPRITE_DATA+27
+
+	lda #1
+	jsr FamiToneMusicPause
+
+	lda #SFX_MENU
+	ldx #FT_SFX_CH0
+	jsr FamiToneSfxPlay
+
+	@loop_pause_screen:
+		jsr read_controller
+		
+		lda ctrlButtons
+		and #CONTROLLER_START
+		beq @done_start
+			lda lastCtrlButtons
+			and #CONTROLLER_START
+			bne @done_start
+			jmp @escape_pause
+		@done_start:
+
+		jsr FamiToneUpdate
+		jsr vblank_wait
+		jsr do_sprite0
+
+	jmp @loop_pause_screen
+
+	@escape_pause:
+		jsr disable_all
+		jsr vblank_wait
+		jsr load_palettes_for_dimension
+		jsr load_sprite_palettes
+		jsr restore_duck
+		reset_ppu_scrolling
+		lda #0
+		jsr FamiToneMusicPause
+		lda #SFX_MENU_DOWN
+		ldx #FT_SFX_CH0
+		jsr FamiToneSfxPlay
+
+		jsr vblank_wait
+
+		lda ppuCtrlBuffer
+		ora #%00000100
+		sta ppuCtrlBuffer
+		jsr enable_all
+		rts
 	
 disable_all:
 	ldx #$00

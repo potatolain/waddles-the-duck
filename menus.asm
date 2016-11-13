@@ -19,7 +19,9 @@ load_menu:
 	lda #SPRITE_OFFSCREEN
 	@sprite_loop: 
 		sta SPRITE_DATA, x
-		inx
+		.repeat 4
+			inx
+		.endrepeat
 		cpx #0
 		bne @sprite_loop
 
