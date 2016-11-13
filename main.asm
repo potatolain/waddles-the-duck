@@ -59,6 +59,7 @@
 	lastCtrlButtons:			.res 1
 	playerVelocity:				.res 1
 	playerYVelocity:			.res 1
+	playerVelocityLockTime:		.res 1
 	flightTimer:				.res 1
 	playerDirection:			.res 1
 	lastPlayerDirection:		.res 1
@@ -105,6 +106,7 @@
 	PLAYER_VELOCITY_JUMPING		= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
 	PLAYER_JUMP_TIME_RUN		= $14
 	PLAYER_JUMP_TIME			= $10
+	HOP_LOCK_TIME				= $6
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
 	PLAYER_DIRECTION_MASK		= %00100000
@@ -2123,6 +2125,24 @@ do_sprite_collision:
 			jmp do_player_death						
 		@above:
 			jsr squish_sprite
+
+			lda #PLAYER_VELOCITY_JUMPING
+			sta playerYVelocity
+			lda playerVelocity
+			cmp #PLAYER_VELOCITY_FAST
+			beq @fast
+			cmp #256-PLAYER_VELOCITY_FAST
+			beq @fast
+				lda #PLAYER_JUMP_TIME
+				jmp @do_jump
+			@fast: 
+				lda #PLAYER_JUMP_TIME_RUN
+			@do_jump:
+			sta flightTimer
+
+			lda #HOP_LOCK_TIME
+			sta playerVelocityLockTime
+
 		
 		rts
 	@not_jumpable:
@@ -2308,6 +2328,12 @@ remove_sprite:
 
 	
 handle_main_input: 
+	lda playerVelocityLockTime
+	cmp #0
+	beq @not_locked
+		dec playerVelocityLockTime
+		rts ; TODO: Once we have a pause button, others, allow them here.
+	@not_locked:
 	lda #0
 	sta playerVelocity
 	jsr read_controller

@@ -108,9 +108,9 @@ upload:
 	$(UPLOADER) bin/main.nes
 
 clean: 
-	rm bin/*.nes
-	rm bin/cartridge.bin
-	rm bin/main*.bin
-	rm bin/*.dbg
-	rm bin/mainDetails.txt
-	rm levels/processed/*.asm
+	-rm -f bin/*.nes
+	-rm -f bin/cartridge.bin
+	-rm -f bin/main*.bin
+	-rm -f bin/*.dbg
+	-rm -f bin/mainDetails.txt
+	-rm -f levels/processed/*.asm
