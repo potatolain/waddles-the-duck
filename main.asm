@@ -580,6 +580,25 @@ initialize_player_sprite:
 	
 	rts
 
+; Seeds levelPosition, same as the others, but uses the player's 
+; exact current position, rather than projected w/ movement.
+seed_level_position_l_current:
+	lda playerPosition
+	sec
+	sbc playerScreenPosition
+	sta levelPosition
+	lda playerPosition+1
+	sbc #0
+	sta temp0
+
+
+	.repeat 4
+		lsr temp0
+		ror levelPosition
+	.endrepeat
+	dec levelPosition ; Jump back one row, once again to keep it offscreen.
+	rts
+
 seed_level_position_l:
 	lda tempPlayerPosition
 	sec
@@ -1510,7 +1529,7 @@ do_player_movement:
 		sta tempPlayerPosition+1
 		sta temp0
 
-		lda playerScreenPosition
+		lda PLAYER_SPRITE+3
 		sta tempPlayerScreenPosition
 		clc
 		adc playerVelocity
@@ -1531,7 +1550,7 @@ do_player_movement:
 		sta tempPlayerPosition+1
 		sta temp0
 
-		lda playerScreenPosition
+		lda PLAYER_SPRITE+3
 		sta tempPlayerScreenPosition
 		clc
 		adc playerVelocity
@@ -1786,7 +1805,7 @@ do_player_movement:
 do_sprite_movement:
 	lda levelPosition
 	pha
-	jsr seed_level_position_l
+	jsr seed_level_position_l_current
 	lda levelPosition
 	sta tempAddr
 	lda #0
@@ -1799,17 +1818,6 @@ do_sprite_movement:
 	lda scrollX
 	and #%00001111
 	sta temp2
-	lda playerDirection
-	cmp #PLAYER_DIRECTION_RIGHT
-	beq @no_change
-		; TODO: Document why this had to be done.
-		lda temp2
-		sec
-		sbc #2
-		and #%00001111
-		sta temp2
-	@no_change:
-
 
 	ldx #0
 	@loop:
