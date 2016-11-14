@@ -1961,6 +1961,11 @@ test_sprite_collision:
 		cmp PLAYER_SPRITE ; playerTopEdge
 		bcc @continue
 
+		; Is this sprite dead? Don't do things with dead sprites. It's just wrong.
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		cmp #0
+		beq @continue
+
 		jsr do_sprite_collision
 
 		@continue:
