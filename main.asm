@@ -179,7 +179,7 @@
 
 	; How many frames the player goes up before going down if dying to an enemy.
 	DEATH_HOP_TIME			= 6
-	DEATH_SONG_TIME			= 64
+	DEATH_SONG_TIME			= 128
 
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
