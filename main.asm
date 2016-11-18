@@ -18,7 +18,7 @@
 ; $200-2ff: Sprites
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
 ; $400-41f: Current level data.
-; $420-4ff: Unused (Reserved: static collectible data)
+; $420-4ff: Static collectible data
 ; $500-55f: Screen buffer
 ; $560-5ff: Unused
 ; $600-6ff: Map data
@@ -39,6 +39,7 @@
 	temp5:						.res 1
 	temp6:						.res 1
 	temp7:						.res 1
+	temp8:						.res 1
 	tempCollision:				.res 1 ; Yes, this is lame.
 	playerPosition:				.res 2
 	playerScreenPosition:		.res 1
@@ -79,10 +80,15 @@
 	currentSprite:				.res 1
 	xScrollChange:				.res 1
 	duckPausePosition:			.res 1
+	macroTmp:					.res 1
+	gemCount:					.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
 	CHAR_SPACE					= $ff
+	COLLECTIBLE_DATA			= $420
+	MAGICAL_BYTE				= $4ff
+	MAGICAL_BYTE_VALUE			= $db
 	SCREEN_DATA					= $600
 	NEXT_ROW_CACHE				= $500
 	NEXT_ROW_ATTRS				= $540 ; This could share space with cache if needed.
@@ -112,6 +118,7 @@
 	PLAYER_DIRECTION_RIGHT		= $0
 	PLAYER_DIRECTION_MASK		= %00100000
 	SPRITE_ZERO_POSITION		= $27
+	SPRITE_ZERO_X				= $80
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
 	HEADER_PIXEL_OFFSET			= 48
@@ -170,6 +177,9 @@
 	TILE_ICE_BLOCK			= 27
 
 	TILE_LEVEL_END			= 51
+
+	GAME_TILE_A				= $e6
+	GAME_TILE_0				= $dc
 
 	SPRITE_DYING			= $0c
 	SPRITE_PAUSE_LETTERS	= $e0
@@ -233,19 +243,20 @@ Store all sprite info in a 60 byte table, with 8 bytes per sprite.
 ; 6		type?
 ; 7		sprite-specific data
 */
-SPRITE_DATA_X 			= 0
-SPRITE_DATA_Y 			= 2
-SPRITE_DATA_ID			= 3
-SPRITE_DATA_DIRECTION 	= 5
-SPRITE_DATA_ANIM_STATE	= 5
-SPRITE_DATA_ALIVE		= 4
-SPRITE_DATA_TILE_ID		= 6
-SPRITE_DATA_LVL_INDEX	= 7
-SPRITE_DATA_WIDTH		= 8
-SPRITE_DATA_HEIGHT		= 9
-SPRITE_DATA_SIZE		= 10
-SPRITE_DATA_ANIM_TYPE	= 11
-SPRITE_DATA_TYPE		= 12
+SPRITE_DATA_X 						= 0
+SPRITE_DATA_Y 						= 2
+SPRITE_DATA_ID						= 3
+SPRITE_DATA_DIRECTION 				= 5
+SPRITE_DATA_ANIM_STATE				= 5
+SPRITE_DATA_ALIVE					= 4
+SPRITE_DATA_TILE_ID					= 6
+SPRITE_DATA_LVL_INDEX				= 7
+SPRITE_DATA_WIDTH					= 8
+SPRITE_DATA_HEIGHT					= 9
+SPRITE_DATA_SIZE					= 10
+SPRITE_DATA_ANIM_TYPE				= 11
+SPRITE_DATA_TYPE					= 12
+SPRITE_DATA_LEVEL_DATA_POSITION 	= 13
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -298,7 +309,14 @@ clear_memory:
 	sta	$0000, x
 	sta	$0100, x
 	sta	$0300, x
-	sta	$0400, x
+	; Use a `magical` byte to not reset the $400 memory page on reset, allowing us to keep your gem count through restarts.
+	lda MAGICAL_BYTE
+	cmp #MAGICAL_BYTE_VALUE
+	beq @no_400
+		lda #0
+		sta	$0400, x
+	@no_400:
+	lda #0
 	sta	$0500, x
 	sta	$0600, x
 	sta	$0700, x
@@ -313,6 +331,8 @@ clear_memory:
 	sta	$0200, x	; move all sprites off screen
 	inx
 	bne	clear_memory
+
+	store #MAGICAL_BYTE_VALUE, MAGICAL_BYTE
 	
 	;; second wait for vblank, PPU is ready after this
 vblankwait2:
@@ -442,7 +462,7 @@ load_level:
 	; ldx #0 ; Implied.
 	lda #0
 	@loop_delevel:
-		sta CURRENT_LEVEL_DATA
+		sta CURRENT_LEVEL_DATA, x
 		inx
 		cpx #CURRENT_LEVEL_DATA_LENGTH
 		bne @loop_delevel
@@ -753,6 +773,39 @@ load_current_line:
 				beq @dun_move_on
 					jmp @move_on_plx
 				@dun_move_on:
+
+
+			phx
+			; Make sure it's not a dupe... last check, honest
+			ldx #0
+			@loop_dedupe: 
+				; what the heck is efficiency? TODO: This could be better in many ways.
+				phx
+				txa
+				asl
+				asl
+				asl
+				asl
+				tax
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+				sta macroTmp ; TODO: This is... bad form. Plain and simple. 
+				lda macroTmp
+				cmp #0
+				beq @not_covered ; Kind of a hack... your first sprite may get dupes, but this way we don't have to throw a bogus value in to start.
+				cpy macroTmp
+				bne @not_covered
+					plx
+					plx
+					; Escape. Escape.
+					jmp @move_on_plx
+				@not_covered:
+				plx
+				inx
+				cpx #NUM_VAR_SPRITES
+				bne @loop_dedupe
+			plx
+
+
 			lda currentSprite
 			clc 
 			adc #$10
@@ -764,6 +817,7 @@ load_current_line:
 				sta currentSprite
 			@okay:
 			ldx currentSprite
+			sty temp7
 
 			iny
 			lda (lvlSpriteDataAddr), y ; Y Position of the sprite
@@ -791,8 +845,13 @@ load_current_line:
 			
 			lda #0
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ALIVE, x
+			
 			lda #SPRITE_DIRECTION_LEFT
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
+			lda temp7
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+
 
 			; Get our real type... have to get it off sprite_definitions, which is "fun"
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
@@ -853,8 +912,29 @@ load_current_line:
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 
+			cmp #SPRITE_TYPE_COLLECTIBLE
+			bne @not_collectible
+				phxy
+					; TODO: It's painfully inefficient to do this here... we could stop building this up before we even started
+					; Also, I lied, that wasn't the last check. ;)
 
-			; Skip @move_on because we increased y ourselves. Do it one more time to finish up
+					jsr get_bit_values_for_collectible
+					; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
+					and COLLECTIBLE_DATA, y
+					cmp #0
+					beq @dont_kill_the_sprite
+						plxy
+						phy
+						jsr remove_sprite
+						ply
+						jmp @not_collectible ; we already brought back our regs, so skip over the plxy
+					@dont_kill_the_sprite:
+				plxy
+			@not_collectible:
+
+
+			; Skip @move_on because we increased y ourselves. Do it one more time to finish up, and one more for the padding byte.
+			iny
 			iny
 			pla
 			tax
@@ -864,7 +944,7 @@ load_current_line:
 			pla
 			tax
 		@move_on:
-		.repeat 3
+		.repeat 4
 			iny
 		.endrepeat
 		inx
@@ -1972,6 +2052,9 @@ test_sprite_collision:
 		txa
 		clc
 		adc #16
+		; Something, somewhere, somehow is adding 1 to x. I'm not sure where it is; may be carry, but this will fix it for now.
+		; TODO: Figure out why this was needed; ideally remove it.
+		and #%11110000
 		tax
 		cpx #(NUM_VAR_SPRITES*16)
 		bne @loop
@@ -2128,14 +2211,21 @@ do_sprite_collision:
 	bne @not_collectible
 
 		jsr remove_sprite		
+		phxy
+
+		jsr get_bit_values_for_collectible
+		; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
+		ora COLLECTIBLE_DATA, y
+		sta COLLECTIBLE_DATA, y ; IT. IS. DONE.
+		
+		jsr update_gem_count
+
 		; Ding dong?
-		txa
-		pha
 		lda #SFX_COIN
 		ldx #FT_SFX_CH0
 		jsr FamiToneSfxPlay
-		pla
-		tax
+		
+		plxy
 		rts
 	@not_collectible:
 	cmp #SPRITE_TYPE_JUMPABLE_ENEMY
@@ -2178,6 +2268,64 @@ do_sprite_collision:
 		jmp do_player_death
 	@not_invuln:
 
+	rts
+
+; Gets the position of a collectible. Give it: 
+; x - the index off EXTENDED_SPRITE_DATA
+; all registers will be destroyed. Push em if you need em.
+get_bit_values_for_collectible:
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+	sta temp7
+	ldy #2
+	ldx #0
+	@find_it: 
+		lda (lvlSpriteDataAddr), y
+		cmp #COLLECTIBLE_SPRITE_ID
+		bne @not_collectibleb
+			inx
+		@not_collectibleb:
+		dey
+		dey
+		cpy temp7
+		bne @go_find_it
+			jmp @found_it
+		@go_find_it:
+		iny
+		iny
+		
+		iny
+		iny
+		iny
+		iny
+		jmp @find_it
+	@found_it:
+		
+	stx watchme
+
+	stx temp7 
+	; Okay, we now know what collectible  id this is... now we need to get it to a bit id
+
+	lda currentLevel
+	asl
+	asl ; Each level gets 4 bytes = 32 total coins. 1 bit per.
+	tay
+	
+	ldx #0
+	lda #1
+	@convert_it:
+		cpx temp7
+		beq @done_convert
+		
+		asl
+		bcc @no_carry
+			lda #1
+			iny
+		@no_carry: 
+
+		inx
+		jmp @convert_it
+
+	@done_convert:
 	rts
 
 do_player_death:
@@ -2335,12 +2483,12 @@ remove_sprite:
 	; Also update level data...
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
 	tay
-	store #0, temp0
+	store #0, temp8
 	lda #1
 	@loop_indexer:
 		asl
 		bcc @no_reloop
-			inc temp0
+			inc temp8
 			lda #1
 		@no_reloop:
 		dey
@@ -2348,9 +2496,46 @@ remove_sprite:
 		bne @loop_indexer
 
 		; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
-	ldy temp0
+	ldy temp8
 	ora CURRENT_LEVEL_DATA, y
 	sta CURRENT_LEVEL_DATA, y
+	rts
+
+update_gem_count:
+	phxy
+	lda currentLevel
+	asl
+	asl
+	tay
+	lda #0
+	sta gemCount
+	.repeat 4
+		ldx #0
+		lda COLLECTIBLE_DATA, y
+		: ; No name loop label (No names for labels in this section because we're in a repeat, and we don't want names to collide)
+			asl ; (There's likely a smarter way to do this, but this works. If you see this and are facepalming at it, submit a PR to fix it!)
+			pha
+			lda gemCount
+			adc #0 ; We're really just using the value of the carry for each bit. asl drops it in.
+			sta gemCount
+			and #%00001111
+			cmp #$a
+			bne :+
+				; If we hit 10, bounce up, just like non-hex numbers. Just... drop the hexxy bits.
+				lda gemCount
+				clc
+				adc #6
+				sta gemCount
+			: ; No name end of section label 
+			
+			pla
+
+			inx
+			cpx #8
+			bne :--
+		iny
+	.endrepeat
+	plxy
 	rts
 
 	
@@ -2486,7 +2671,7 @@ load_sprite0:
 	sta SPRITE_ZERO+1
 	lda #%00000000
 	sta SPRITE_ZERO+2
-	lda #$80
+	lda #SPRITE_ZERO_X
 	sta SPRITE_ZERO+3
 	; set y last as we test on it.
 	lda #SPRITE_ZERO_POSITION
@@ -2936,6 +3121,8 @@ main_loop:
 		@do_draw:
 		jsr draw_current_nametable_row
 	@go_on:
+	; If we're running out of cycles during vblank, this probably doesn't have to happen most of the time.
+	jsr update_hud_gem_count
 
 	jsr do_sprite0
 
@@ -2996,6 +3183,7 @@ clear_var_sprites:
 show_level: 
 	jsr disable_all
 	jsr vblank_wait
+	jsr update_gem_count
 
 	; Turn off 32 bit adding for addresses initially.
 	lda ppuCtrlBuffer

@@ -29,3 +29,40 @@ show_hud:
 	store #TILE_BORDER_BR, PPU_DATA
 	
 	rts
+
+update_hud_gem_count: 
+	lda ppuCtrlBuffer
+	and #%00001000
+	sta PPU_CTRL
+
+	set_ppu_addr $2096
+	lda #GAME_TILE_A+6 ; G
+	sta PPU_DATA
+	lda #GAME_TILE_A+4 ; E
+	sta PPU_DATA
+	lda #GAME_TILE_A+12 ; M
+	sta PPU_DATA
+	lda #GAME_TILE_A+18 ; S
+	sta PPU_DATA
+	lda #GAME_TILE_0-3
+	STA PPU_DATA
+	lda #0
+	sta PPU_DATA
+	
+	lda gemCount ; left digit
+	.repeat 4
+		lsr
+	.endrepeat
+	clc
+	adc #GAME_TILE_0
+	sta PPU_DATA
+
+	lda gemCount ; right digit
+	and #%00001111
+	clc
+	adc #GAME_TILE_0
+	sta PPU_DATA 
+
+	lda ppuCtrlBuffer
+	sta PPU_CTRL
+rts

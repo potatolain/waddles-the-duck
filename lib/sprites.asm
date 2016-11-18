@@ -24,6 +24,8 @@ PALETTE_1				= %00000001
 PALETTE_2				= %00000010
 PALETTE_3				= %00000011
 
+COLLECTIBLE_SPRITE_ID	= 0
+
 sprite_definitions: 
 	; Type, width, height, animation, first tile id.
 	.byte SPRITE_TYPE_COLLECTIBLE, 16, 16, SPRITE_SIZE_DEFAULT, SPRITE_ANIMATION_NONE, $0, PALETTE_0, $0		; 0. Coin

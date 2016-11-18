@@ -149,7 +149,7 @@ fileData =
 	lvlName+'_sprites:' + NL;
 
 for (var i = 0; i < spriteDefs.length; i++) {
-	fileData += '	.byte ' + spriteDefs[i].x + ', ' + spriteDefs[i].y + ', ' + spriteDefs[i].id + NL;
+	fileData += '	.byte ' + spriteDefs[i].x + ', ' + spriteDefs[i].y + ', ' + spriteDefs[i].id +', 0' + NL;
 }
 
 fileData += 

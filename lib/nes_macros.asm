@@ -88,3 +88,49 @@
 		sta PPU_DATA
 	.endrepeat 
 .endmacro
+
+.macro phx
+	sta macroTmp
+	txa
+	pha
+	lda macroTmp
+.endmacro
+
+.macro phy
+	sta macroTmp
+	tya
+	pha
+	lda macroTmp
+.endmacro
+
+.macro plx
+	sta macroTmp
+	pla
+	tax
+	lda macroTmp
+.endmacro
+
+.macro ply
+	sta macroTmp
+	pla
+	tay
+	lda macroTmp
+.endmacro
+
+.macro phxy
+	sta macroTmp
+	txa
+	pha
+	tya
+	pha
+	lda macroTmp
+.endmacro
+
+.macro plxy
+	sta macroTmp
+	pla
+	tay
+	pla
+	tax
+	lda macroTmp
+.endmacro
