@@ -35,7 +35,7 @@ update_hud_gem_count:
 	and #%00001000
 	sta PPU_CTRL
 
-	set_ppu_addr $2096
+	set_ppu_addr $2094
 	lda #GAME_TILE_A+6 ; G
 	sta PPU_DATA
 	lda #GAME_TILE_A+4 ; E
@@ -63,6 +63,24 @@ update_hud_gem_count:
 	adc #GAME_TILE_0
 	sta PPU_DATA 
 
+	lda #GAME_TILE_0-2
+	sta PPU_DATA
+
+	lda totalGemCount
+	.repeat 4
+		lsr
+	.endrepeat
+	clc
+	adc #GAME_TILE_0
+	sta PPU_DATA
+
+	lda totalGemCount
+	and #%00001111
+	clc
+	adc #GAME_TILE_0
+	sta PPU_DATA
+
 	lda ppuCtrlBuffer
 	sta PPU_CTRL
+
 rts

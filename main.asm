@@ -82,6 +82,7 @@
 	duckPausePosition:			.res 1
 	macroTmp:					.res 1
 	gemCount:					.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
+	totalGemCount:				.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -2538,6 +2539,36 @@ update_gem_count:
 	plxy
 	rts
 
+update_total_gem_count:
+	store #0, totalGemCount
+	
+	ldy #0
+	@level_data_loop:
+		lda (lvlSpriteDataAddr), y
+		cmp #$ff
+		beq @done_level_data_loop
+		iny
+		iny
+		lda (lvlSpriteDataAddr), y
+		cmp #SPRITE_TYPE_COLLECTIBLE
+		bne @not_collectible
+			inc totalGemCount
+			lda totalGemCount
+			and #%00001111
+			cmp #$a
+			bne @not_inc_it
+				lda totalGemCount
+				clc
+				adc #6
+				sta totalGemCount
+			@not_inc_it:
+		@not_collectible:
+		iny
+		iny
+		jmp @level_data_loop
+	@done_level_data_loop:
+	rts
+
 	
 handle_main_input: 
 	lda playerVelocityLockTime
@@ -3196,6 +3227,8 @@ show_level:
 	jsr load_graphics_data
 	jsr draw_switchable_tiles
 	jsr load_palettes_for_dimension
+	jsr update_total_gem_count
+
 
 
 	; Turn on 32 bit adding for addresses to load rows.
