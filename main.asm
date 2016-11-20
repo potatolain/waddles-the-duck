@@ -277,7 +277,7 @@ SPRITE_DIRECTION_RIGHT 			= PLAYER_DIRECTION_RIGHT
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	DEBUGGING			= 1
+	DEBUGGING			= 0
 	
 .segment "STUB"
 	resetstub:

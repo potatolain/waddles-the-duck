@@ -193,7 +193,7 @@ music_music_data:
 @ref25:
 	.byte $96,$67,$00,$6b,$6d,$75,$00,$7b,$01,$00,$7a,$df
 @ref26:
-	.byte $f9,$85
+	.byte $8c,$34,$f9,$83
 @ref27:
 	.byte $f9,$85
 	.byte $fd
@@ -285,64 +285,89 @@ music_music_data:
 	.byte $fb,$08
 @song4ch0loop:
 @ref45:
-	.byte $8c,$42,$85,$50,$85,$57,$51,$57,$50,$81
+	.byte $8c,$42,$85,$50,$85,$57,$51,$57,$50,$99,$00,$85
 @ref46:
-	.byte $97,$00,$85
+	.byte $5a,$85,$68,$85,$6f,$69,$6f,$68,$99,$00,$85
 @ref47:
-	.byte $5a,$85,$68,$85,$6f,$69,$6f,$68,$81
-@ref48:
-	.byte $97,$00,$85
+	.byte $42,$85,$50,$85,$57,$51,$57,$50,$99,$00,$85
+	.byte $ff,$0b
+	.word @ref46
+@ref49:
+	.byte $35,$01,$35,$01,$39,$00,$87,$00,$35,$01,$35,$01,$39,$00,$89
+@ref50:
+	.byte $4d,$01,$4d,$01,$51,$00,$87,$00,$4d,$01,$4d,$01,$51,$00,$89
 	.byte $fd
 	.word @song4ch0loop
 
 @song4ch1:
 @song4ch1loop:
-@ref49:
-	.byte $88,$12,$83,$00,$2c,$83,$00,$12,$12,$12,$2c,$83,$00,$81
-@ref50:
-	.byte $12,$83,$00,$2c,$83,$00,$12,$12,$12,$2d,$00,$16,$18
 @ref51:
-	.byte $12,$83,$00,$2c,$83,$00,$12,$12,$12,$2d,$20,$20,$81
+	.byte $88,$12,$83,$00,$2c,$83,$00,$12,$12,$12,$2c,$83,$01,$12,$83,$00
+	.byte $2c,$83,$00,$12,$12,$12,$2d,$00,$16,$18
 @ref52:
-	.byte $12,$83,$00,$2c,$83,$00,$12,$12,$12,$2c,$00,$38,$3c,$81
+	.byte $12,$83,$00,$2c,$83,$00,$12,$12,$12,$2d,$20,$21,$12,$83,$00,$2c
+	.byte $83,$00,$12,$12,$12,$2c,$00,$38,$3c,$81
+@ref53:
+	.byte $12,$83,$00,$2c,$83,$00,$12,$12,$12,$2c,$83,$01,$12,$83,$00,$2c
+	.byte $83,$00,$12,$12,$12,$2d,$00,$16,$18
+	.byte $ff,$1a
+	.word @ref52
+	.byte $ff,$19
+	.word @ref53
+	.byte $ff,$1a
+	.word @ref52
 	.byte $fd
 	.word @song4ch1loop
 
 @song4ch2:
 @song4ch2loop:
-@ref53:
-	.byte $9f
-@ref54:
-	.byte $9f
-@ref55:
-	.byte $9f
-@ref56:
-	.byte $9f
+@ref57:
+	.byte $bf
+@ref58:
+	.byte $bf
+@ref59:
+	.byte $bf
+@ref60:
+	.byte $bf
+@ref61:
+	.byte $bf
+@ref62:
+	.byte $bf
 	.byte $fd
 	.word @song4ch2loop
 
 @song4ch3:
 @song4ch3loop:
-	.byte $ff,$0b
-	.word @ref12
-	.byte $ff,$0b
-	.word @ref13
-	.byte $ff,$0b
-	.word @ref13
-	.byte $ff,$0b
-	.word @ref13
+@ref63:
+	.byte $80,$18,$00,$19,$1c,$00,$1d,$0e,$00,$19,$00,$85,$18,$00,$19,$1c
+	.byte $00,$1d,$0e,$00,$19,$00,$85
+@ref64:
+	.byte $18,$00,$19,$1c,$00,$1d,$0e,$00,$19,$00,$85,$18,$00,$19,$1c,$00
+	.byte $1d,$0e,$00,$19,$00,$85
+	.byte $ff,$16
+	.word @ref64
+	.byte $ff,$16
+	.word @ref64
+	.byte $ff,$16
+	.word @ref64
+	.byte $ff,$16
+	.word @ref64
 	.byte $fd
 	.word @song4ch3loop
 
 @song4ch4:
 @song4ch4loop:
-@ref61:
-	.byte $9f
-@ref62:
-	.byte $9f
-@ref63:
-	.byte $9f
-@ref64:
-	.byte $9f
+@ref69:
+	.byte $bf
+@ref70:
+	.byte $bf
+@ref71:
+	.byte $bf
+@ref72:
+	.byte $bf
+@ref73:
+	.byte $bf
+@ref74:
+	.byte $bf
 	.byte $fd
 	.word @song4ch4loop
