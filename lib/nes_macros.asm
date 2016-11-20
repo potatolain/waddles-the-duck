@@ -134,3 +134,37 @@
 	tax
 	lda macroTmp
 .endmacro
+
+.macro bank_temp banknum
+	tya
+	pha
+	
+	lda banknum
+	clc
+	adc #<(BANK_SWITCH_ADDR)
+	sta macroTmp
+	lda #>(BANK_SWITCH_ADDR)
+	sta macroTmp+1
+
+	lda banknum
+	ldy #0
+	sta (macroTmp), y
+
+	pla
+	tay
+.endmacro
+
+.macro bank banknum
+	bank_temp banknum
+	sta currentBank
+.endmacro
+
+.macro bank_restore
+	bank_temp currentBank
+.endmacro
+
+; UxROM has a weird restriction where the value of the byte you write to must match the value of the byte itself.
+; As a result, we need to stick this in all banks slated for $8000
+.macro banktable
+  .byte $00, $01, $02, $03, $04, $05, $06
+.endmacro

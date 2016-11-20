@@ -108,7 +108,7 @@ show_title:
 	jsr load_title
 	
 	@loopa: 
-		jsr FamiToneUpdate
+		jsr sound_update
 		jsr read_controller
 		
 		jsr vblank_wait
@@ -127,7 +127,7 @@ show_title:
 	@game_time: 
 		lda #SFX_MENU
 		ldx #FT_SFX_CH0
-		jsr FamiToneSfxPlay
+		jsr sfx_play
 
 		jmp show_ready
 
@@ -143,7 +143,7 @@ load_ready:
 
 show_ready:
 	lda #1
-	jsr FamiToneMusicPause
+	jsr music_pause
 	jsr load_ready
 
 	lda #0
@@ -155,7 +155,7 @@ show_ready:
 		pha
 		; Not really doing anything... just makes it look less like we're locked for frames. Could easily be ditched.
 		jsr read_controller
-		jsr FamiToneUpdate
+		jsr sound_update
 		reset_ppu_scrolling
 		jsr vblank_wait
 		reset_ppu_scrolling

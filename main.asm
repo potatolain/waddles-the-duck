@@ -80,9 +80,10 @@
 	currentSprite:				.res 1
 	xScrollChange:				.res 1
 	duckPausePosition:			.res 1
-	macroTmp:					.res 1
+	macroTmp:					.res 2
 	gemCount:					.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
-	totalGemCount:				.res 1
+	totalGemCount:				.res 1 ; So does this.
+	currentBank:				.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -164,6 +165,7 @@
 	
 	BANK_SWITCH_ADDR 		= $8000
 	BANK_SPRITES_AND_LEVEL	= 0
+	BANK_MUSIC_AND_SOUND	= 1
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
@@ -208,10 +210,11 @@
 	SFX_SQUISH		= 9
 	SFX_HURT		= 8
 	SFX_MENU_DOWN	= 10
+	SFX_DEATH		= 11
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
-	SONG_CRAPPY 		= 0
+	SONG_CRAPPY 		= 4
 	SONG_ICE_CRAPPY 	= 1
 	SONG_DEATH			= 3
 
@@ -365,16 +368,15 @@ vblankwait3:
 	bpl	vblankwait3
 	
 ; Use first bank.
-lda BANK_SPRITES_AND_LEVEL
-sta BANK_SWITCH_ADDR
-	
+bank #BANK_SPRITES_AND_LEVEL
+
 ldx #<(all_music)
 ldy #>(all_music)
 lda #1 ; play ntsc musics/sound.
-jsr FamiToneInit
+jsr music_init
 ldx #<(all_sfx)
 ldy #>(all_sfx)
-jsr FamiToneSfxInit
+jsr sfx_init
 
 store #0, currentLevel
 
@@ -2324,7 +2326,7 @@ do_sprite_collision:
 		; Ding dong?
 		lda #SFX_COIN
 		ldx #FT_SFX_CH0
-		jsr FamiToneSfxPlay
+		jsr sfx_play
 		
 		plxy
 		rts
@@ -2430,11 +2432,11 @@ get_bit_values_for_collectible:
 do_player_death:
 	txa
 	pha
-	lda #SFX_HURT
+	lda #SFX_DEATH
 	ldx #FT_SFX_CH1
-	jsr FamiToneSfxPlay
+	jsr sfx_play
 	lda #SONG_DEATH
-	jsr FamiToneMusicPlay
+	jsr music_play
 	pla
 	tax
 
@@ -2462,7 +2464,7 @@ do_player_death:
 		pha
 		jsr vblank_wait
 		jsr do_sprite0
-		jsr FamiToneUpdate
+		jsr sound_update
 		pla
 		tax
 		inx
@@ -2488,7 +2490,7 @@ do_player_death:
 
 		jsr vblank_wait
 		jsr do_sprite0
-		jsr FamiToneUpdate
+		jsr sound_update
 		jmp @falldown_goboom
 	@dead:
 	ldx #00
@@ -2497,7 +2499,7 @@ do_player_death:
 		pha
 		jsr vblank_wait
 		jsr do_sprite0
-		jsr FamiToneUpdate
+		jsr sound_update
 		pla
 		tax
 		inx
@@ -2559,7 +2561,7 @@ squish_sprite:
 	pha
 	lda #SFX_SQUISH
 	ldx #FT_SFX_CH1
-	jsr FamiToneSfxPlay
+	jsr sfx_play
 	pla
 	tax
 
@@ -2755,7 +2757,7 @@ handle_main_input:
 		
 		lda #SFX_JUMP
 		ldx #SOUND_CHANNEL_PLAYER
-		jsr FamiToneSfxPlay
+		jsr sfx_play
 
 	@done_a:
 	
@@ -2947,18 +2949,18 @@ play_music_for_dimension:
 	cmp #DIMENSION_PLAIN
 	bne @not_plain
 		lda #SONG_CRAPPY
-		jsr FamiToneMusicPlay
+		jsr music_play
 		rts
 	@not_plain: 
 	cmp #DIMENSION_ICE_AGE
 	bne @not_ice_age
 		lda #SONG_ICE_CRAPPY 
-		jsr FamiToneMusicPlay
+		jsr music_play
 		rts
 	@not_ice_age:
 	; Fall back to default track for consistency's sake.
 	lda #SONG_CRAPPY
-	jsr FamiToneMusicPlay 
+	jsr music_play
 	rts
 
 ; Child of do_dimensional_transfer - does the actual fading to decrease code dupe.
@@ -3085,8 +3087,8 @@ do_dimensional_transfer:
 
 	lda #SFX_WARP
 	ldx #SOUND_CHANNEL_PLAYER
-	jsr FamiToneSfxPlay
-	jsr FamiToneMusicPause ; A should be non-zero here, causing a pause.
+	jsr sfx_play
+	jsr music_pause ; A should be non-zero here, causing a pause.
 
 
 	lda ppuCtrlBuffer
@@ -3149,10 +3151,10 @@ do_dimensional_transfer:
 			; TODO: Probably need this passed in. temp5 is unused, or we could define one just for this. 
 			jsr vblank_wait
 			jsr do_sprite0
-			jsr FamiToneUpdate
+			jsr sound_update
 			jsr disable_all
 			jsr vblank_wait
-			jsr FamiToneUpdate
+			jsr sound_update
 
 			lda currentDimension
 			cmp warpDimensionA
@@ -3199,7 +3201,7 @@ do_dimensional_transfer:
 			txa
 			pha
 			reset_ppu_scrolling
-			jsr FamiToneUpdate; We're our own little thing.. need to trigger famitone.
+			jsr sound_update; We're our own little thing.. need to trigger famitone.
 			pla
 			tax 
 			inx
@@ -3214,7 +3216,7 @@ do_dimensional_transfer:
 	sta ppuCtrlBuffer
 	jsr play_music_for_dimension
 	lda #0 ; 0 = play.
-	jsr FamiToneMusicPause
+	jsr music_pause
 	rts
 	
 main_loop: 
@@ -3227,7 +3229,7 @@ main_loop:
 	jsr do_special_tile_stuff
 	jsr do_sprite_movement
 	jsr test_sprite_collision
-	jsr FamiToneUpdate
+	jsr sound_update
 
 	jsr vblank_wait
 	
@@ -3403,11 +3405,11 @@ do_pause_screen:
 	sta VAR_SPRITE_DATA+27
 
 	lda #1
-	jsr FamiToneMusicPause
+	jsr music_pause
 
 	lda #SFX_MENU
 	ldx #FT_SFX_CH0
-	jsr FamiToneSfxPlay
+	jsr sfx_play
 
 	@loop_pause_screen:
 		jsr read_controller
@@ -3421,7 +3423,7 @@ do_pause_screen:
 			jmp @escape_pause
 		@done_start:
 
-		jsr FamiToneUpdate
+		jsr sound_update
 		jsr vblank_wait
 		jsr do_sprite0
 
@@ -3435,10 +3437,10 @@ do_pause_screen:
 		jsr restore_duck
 		reset_ppu_scrolling
 		lda #0
-		jsr FamiToneMusicPause
+		jsr music_pause
 		lda #SFX_MENU_DOWN
 		ldx #FT_SFX_CH0
-		jsr FamiToneSfxPlay
+		jsr sfx_play
 
 		jsr vblank_wait
 
@@ -3518,15 +3520,10 @@ nmi:
 	
 	.include "menus.asm"
 	.include "lib/sprites.asm"
+	.include "lib/sound.asm"
 	
 .segment "BANK0"
-	.include "sound/famitone2.s"
-
-all_music: 
-	.include "sound/music.s"
-
-all_sfx: 
-	.include "sound/sfx.s"
+banktable
 	
 lvl1:
 	.include "levels/lvl1_meta.asm"
@@ -3570,7 +3567,22 @@ menu_palettes:
 .segment "CHUNK"
 	; Nothing here. Just reserving it...
 	.byte $ff
-	
+
+.segment "BANK1"
+banktable
+
+.include "sound/famitone2.s"
+
+all_music: 
+	.include "sound/music.s"
+
+all_sfx: 
+	.include "sound/sfx.s"
+
+.segment "BANK2"
+banktable
+
+
 .segment "RODATA"
 ; To avoid bus conflicts, bankswitch needs to write a value
 ; to a ROM address that already contains that value.
