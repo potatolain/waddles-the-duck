@@ -154,6 +154,9 @@
 	MIN_POSITION_LEFT_SCROLL		= $40
 	MIN_POSITION_RIGHT_SCROLL		= $a0
 	MIN_LEFT_LEVEL_POSITION 		= $02
+
+	MIN_SPRITE_GRAVITY_X		= $30
+	MAX_SPRITE_GRAVITY_X		= $b0
 	
 	WINDOW_WIDTH			= 32
 	WINDOW_WIDTH_TILES		= 16
@@ -271,6 +274,7 @@ SPRITE_DIRECTION_RIGHT 			= PLAYER_DIRECTION_RIGHT
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
+	DEBUGGING			= 1
 	
 .segment "STUB"
 	resetstub:
@@ -1901,16 +1905,112 @@ do_sprite_movement:
 	sta temp2
 
 	ldx #0
+	; little hack to deal with the extreme length of this method. Nothing to see here, just start the loop...
+	jmp @loop
+	@go_no_motion: 
+		jmp @no_motion
+	
 	@loop:
 		txa
 		pha
 		.repeat 4
 			asl
+		.endrepeat
+		tax
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+		cmp #SPRITE_TYPE_COLLECTIBLE
+		beq @go_no_motion
+			
+			; Don't bother calculating gravity if the sprite isn't visible.
+			lda VAR_SPRITE_DATA, x
+			cmp #SPRITE_OFFSCREEN
+			beq @go_no_motion
+
+
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+			sta temp8
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+			sta temp7
+			.repeat 4
+				lsr temp7
+				ror temp8
 			.endrepeat
+			lda temp8
+			sec
+			sbc levelPosition
+			bcc @no_motion ; if you went below 0, that's definitely not gonna work.
+			cmp #4
+			bcc @no_motion
+			cmp #16
+			bcs @no_motion
+
+
+			lda VAR_SPRITE_DATA, x
+			clc
+			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+			sec
+			sbc #HEADER_PIXEL_OFFSET
+			clc
+			adc #PLAYER_VELOCITY_FALLING
+			and #%11110000
+			sta temp6
+			cmp #0
+			bne @not_dead
+				; The sprite has died. Uh oh.
+				jmp @remove
+			@not_dead:
+
+			lda temp8
+			and #%00001111
+			ora temp6
+
+			stx temp7
 			tax 
+			lda SCREEN_DATA, x
+			and #%00111111
+			ldx temp7
+			jsr do_collision_test
+			cmp #0
+			bne @hit
+			
+			; Recalculate for sprite+width
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+			clc
+			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
+			sta temp7
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+			adc #0
+			sta temp8
+			.repeat 4
+				lsr temp7
+				ror temp8
+			.endrepeat
+			lda temp8
+			and #%00001111
+			ora temp6
+
+			stx temp7
+			tax
+			lda SCREEN_DATA, x
+			and #%00111111
+			ldx temp7
+			jsr do_collision_test
+			cmp #0
+			bne @hit
+				; Okay, we tested both sides... you didn't hit. GOING DOWN.
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+				clc
+				adc #PLAYER_VELOCITY_FALLING
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+			@hit:
+
+		@no_motion:
+
+		
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sec
 		sbc #SPRITE_SCREEN_OFFSET+1
+		sec
 		sbc tempAddr
 		sta temp1
 
@@ -2301,8 +2401,6 @@ get_bit_values_for_collectible:
 		jmp @find_it
 	@found_it:
 		
-	stx watchme
-
 	stx temp7 
 	; Okay, we now know what collectible  id this is... now we need to get it to a bit id
 
