@@ -2016,6 +2016,13 @@ do_sprite_movement:
 				jmp @skip_horizontal_movement ; If this sprite was affected by gravity, don't move left/right at all.
 			@hit:
 
+			; Before we do left/right, make sure we aren't dead. Dead things shant move.
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
+			cmp #SPRITE_ANIMATION_DYING
+			bne @not_dying_yet
+				jmp @skip_horizontal_movement
+			@not_dying_yet:
+
 			; Okay, time to start that whole mess again for whatever direction you're facing...
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
 			and #SPRITE_DATA_DIRECTION_MASK
