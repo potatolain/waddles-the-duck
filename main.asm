@@ -40,6 +40,8 @@
 	temp6:						.res 1
 	temp7:						.res 1
 	temp8:						.res 1
+	temp9:						.res 1
+	tempa:						.res 1
 	tempCollision:				.res 1 ; Yes, this is lame.
 	playerPosition:				.res 2
 	playerScreenPosition:		.res 1
@@ -124,6 +126,7 @@
 	PLAYER_HEIGHT				= 16
 	PLAYER_WIDTH				= 24
 	HEADER_PIXEL_OFFSET			= 48
+	SPRITE_HEIGHT_OFFSET		= 8
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
@@ -214,7 +217,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
-	SONG_CRAPPY 		= 4
+	SONG_CRAPPY 		= 5
 	SONG_ICE_CRAPPY 	= 1
 	SONG_DEATH			= 3
 
@@ -608,7 +611,7 @@ initialize_player_sprite:
 	rts
 
 ; Seeds levelPosition, same as the others, but uses the player's 
-; exact current position, rather than projected w/ movement.
+; exact current position, rather than projected w/ movement. Also does not attempt to place you before the screen
 seed_level_position_l_current:
 	lda playerPosition
 	sec
@@ -623,7 +626,6 @@ seed_level_position_l_current:
 		lsr temp0
 		ror levelPosition
 	.endrepeat
-	dec levelPosition ; Jump back one row, once again to keep it offscreen.
 	rts
 
 seed_level_position_l:
@@ -1911,6 +1913,13 @@ do_sprite_movement:
 	jmp @loop
 	@go_no_motion: 
 		jmp @no_motion
+
+	@go_away_forever:
+		lda #0
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		jmp @remove
 	
 	@loop:
 		txa
@@ -1928,7 +1937,7 @@ do_sprite_movement:
 			cmp #SPRITE_OFFSCREEN
 			beq @go_no_motion
 
-
+			; Start of left/right logic
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 			sta temp8
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
@@ -1940,13 +1949,13 @@ do_sprite_movement:
 			lda temp8
 			sec
 			sbc levelPosition
-			bcc @no_motion ; if you went below 0, that's definitely not gonna work.
-			cmp #4
-			bcc @no_motion
+			bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
+			cmp #0
+			beq @go_away_forever
 			cmp #16
-			bcs @no_motion
+			bcs @go_away_forever
 
-
+			
 			lda VAR_SPRITE_DATA, x
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
@@ -1976,13 +1985,13 @@ do_sprite_movement:
 			bne @hit
 			
 			; Recalculate for sprite+width
-			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
-			sta temp7
+			sta temp8
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 			adc #0
-			sta temp8
+			sta temp7
 			.repeat 4
 				lsr temp7
 				ror temp8
@@ -2004,19 +2013,178 @@ do_sprite_movement:
 				clc
 				adc #PLAYER_VELOCITY_FALLING
 				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+				jmp @skip_horizontal_movement ; If this sprite was affected by gravity, don't move left/right at all.
 			@hit:
 
+			; Okay, time to start that whole mess again for whatever direction you're facing...
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+			and #SPRITE_DATA_DIRECTION_MASK
+			cmp #SPRITE_DIRECTION_RIGHT
+			bne @not_right
+				jmp @right
+			@not_right: 
+				; We're goin left!
+				; Start of left/right logic
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+				sta temp8
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+				sta temp7
+				.repeat 4
+					lsr temp7
+					ror temp8
+				.endrepeat
+
+				
+				lda VAR_SPRITE_DATA, x
+				sec
+				sbc #HEADER_PIXEL_OFFSET
+				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				and #%11110000
+				sta temp6
+
+				lda temp8
+				and #%00001111
+				ora temp6
+
+				stx temp7
+				tax 
+				lda SCREEN_DATA, x
+				and #%00111111
+				ldx temp7
+				jsr do_collision_test
+				cmp #0
+				bne @hit_l
+				
+				; Recalculate for sprite bottom
+				lda VAR_SPRITE_DATA, x
+				sec
+				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
+				clc
+				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+				sta temp6
+
+				lda temp8 ; X Position doesn't change... just re-use it.
+				and #%00001111
+				ora temp6
+
+				stx temp7
+				tax
+				lda SCREEN_DATA, x
+				and #%00111111
+				ldx temp7
+				jsr do_collision_test
+				cmp #0
+				bne @hit_l
+					; Okay, we tested both sides... you didn't hit. MOVE OUT!
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+					sec
+					sbc #PLAYER_VELOCITY_NORMAL
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+					sbc #0
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+					jmp @skip_horizontal_movement ; If this sprite was affected by gravity, don't move left/right at all.
+				@hit_l:
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+					and #(SPRITE_DATA_DIRECTION_MASK ^ %11111111)
+					ora #SPRITE_DIRECTION_RIGHT
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
+				jmp @skip_horizontal_movement
+			@right:
+				; We're goin right!
+				; Start of left/right logic
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+				clc
+				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
+				sta temp8
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+				adc #0
+				sta temp7
+
+				.repeat 4
+					lsr temp7
+					ror temp8
+				.endrepeat
+				lda temp8
+				;clc
+				;adc #1
+				sta temp8
+
+				
+				lda VAR_SPRITE_DATA, x
+				sec
+				sbc #HEADER_PIXEL_OFFSET
+				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				and #%11110000
+				sta temp6
+
+				lda temp8
+				and #%00001111
+				ora temp6
+
+				stx temp7
+				tax 
+				lda SCREEN_DATA, x
+				and #%00111111
+				ldx temp7
+				jsr do_collision_test
+				cmp #0
+				bne @hit_r
+				
+				; Recalculate for sprite bottom
+				lda VAR_SPRITE_DATA, x
+				sec
+				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
+				clc
+				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+				sta temp6
+
+				lda temp8 ; X Position doesn't change... just re-use it.
+				and #%00001111
+				ora temp6
+
+				stx temp7
+				tax
+				lda SCREEN_DATA, x
+				and #%00111111
+				ldx temp7
+				jsr do_collision_test
+				cmp #0
+				bne @hit_r
+					; Okay, we tested both sides... you didn't hit. MOVE OUT!
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+					clc
+					adc #PLAYER_VELOCITY_NORMAL
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+					adc #0
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+					jmp @skip_horizontal_movement ; If this sprite was affected by gravity, don't move left/right at all.
+				@hit_r:
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+					and #(SPRITE_DATA_DIRECTION_MASK ^ %11111111)
+					ora #SPRITE_DIRECTION_LEFT
+					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
+				jmp @skip_horizontal_movement
+
+			@skip_horizontal_movement:
 		@no_motion:
 
 		
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sec
-		sbc #SPRITE_SCREEN_OFFSET+1
-		sec
 		sbc tempAddr
+		sta temp9
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		sbc #0
+		sta tempa
+		
+		lda temp9
 		sta temp1
 
-		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		lda tempa
 		sbc tempAddr+1
 		cmp #0
 		bne @remove
