@@ -127,6 +127,7 @@
 	PLAYER_WIDTH				= 24
 	HEADER_PIXEL_OFFSET			= 48
 	SPRITE_HEIGHT_OFFSET		= 8
+	SPRITE_VELOCITY_NORMAL		= 1 ; This trips every other frame, so multiply accordinly.
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
@@ -267,6 +268,7 @@ SPRITE_DATA_SIZE					= 10
 SPRITE_DATA_ANIM_TYPE				= 11
 SPRITE_DATA_TYPE					= 12
 SPRITE_DATA_LEVEL_DATA_POSITION 	= 13
+SPRITE_DATA_SPEED					= 14
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
@@ -920,6 +922,12 @@ load_current_line:
 			sta temp7
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+
+			ldx temp6
+			lda sprite_definitions+7, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 
 			cmp #SPRITE_TYPE_COLLECTIBLE
 			bne @not_collectible
@@ -1922,12 +1930,14 @@ do_sprite_movement:
 		jmp @remove
 	
 	@loop:
+		stx tempa
 		txa
 		pha
 		.repeat 4
 			asl
 		.endrepeat
 		tax
+
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 		cmp #SPRITE_TYPE_COLLECTIBLE
 		beq @go_no_motion
@@ -2023,6 +2033,14 @@ do_sprite_movement:
 				jmp @skip_horizontal_movement
 			@not_dying_yet:
 
+			; Do sprite left/right calculations every other frame to slow them down a little and give us more control over speed.
+			lda frameCounter
+			and #%00000010
+			cmp #0
+			beq @keep_going_horizontally
+				jmp @skip_horizontal_movement
+			@keep_going_horizontally:
+
 			; Okay, time to start that whole mess again for whatever direction you're facing...
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
 			and #SPRITE_DATA_DIRECTION_MASK
@@ -2085,7 +2103,7 @@ do_sprite_movement:
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 					sec
-					sbc #PLAYER_VELOCITY_NORMAL
+					sbc EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 					sbc #0
@@ -2162,7 +2180,7 @@ do_sprite_movement:
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 					clc
-					adc #PLAYER_VELOCITY_NORMAL
+					adc EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 					sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 					adc #0
