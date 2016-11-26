@@ -751,6 +751,16 @@ load_current_line:
 		bne @loop
 
 	; The row **also** has sprites! Maybe!
+	ldx levelPosition
+	stx tempa
+	lda playerDirection
+	cmp #PLAYER_DIRECTION_LEFT
+	bne @carry_on_going_right
+		inc levelPosition
+		lda levelPosition
+		sta tempa
+		stx levelPosition
+	@carry_on_going_right:
 	ldy #0
 	ldx #0
 	@loop_sprites:
@@ -759,7 +769,7 @@ load_current_line:
 		bne @not_done_sprites
 			jmp @done_sprites
 		@not_done_sprites:
-		cmp levelPosition
+		cmp tempa
 		beq @dont_move_on
 			jmp @move_on
 		@dont_move_on:
@@ -843,7 +853,7 @@ load_current_line:
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
 			lda #0
 			sta tempAddr+1
-			lda levelPosition
+			lda tempa
 			sta tempAddr
 			.repeat 4 ; get levelPosition to a full-length position...
 				asl tempAddr
@@ -1927,6 +1937,10 @@ do_sprite_movement:
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		
+		lda #255
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
 		jmp @remove
 	
 	@loop:
@@ -1956,14 +1970,30 @@ do_sprite_movement:
 				lsr temp7
 				ror temp8
 			.endrepeat
-			lda temp8
-			sec
-			sbc levelPosition
-			bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
-			cmp #0
-			beq @go_away_forever
-			cmp #16
-			bcs @go_away_forever
+			
+			lda playerDirection
+			cmp #PLAYER_DIRECTION_LEFT
+			beq @remove_left
+				; Going right.
+				lda temp8
+				sec
+				sbc levelPosition
+				bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
+				cmp #0
+				beq @go_away_forever
+				cmp #16
+				bcs @go_away_forever
+				jmp @after_remove
+			@remove_left:
+				lda temp8
+				sec
+				sbc levelPosition
+				bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
+				cmp #16
+				bcs @go_away_forever
+				; jmp @after_remove ; Intentional fallthru
+
+			@after_remove:
 
 			
 			lda VAR_SPRITE_DATA, x
@@ -2132,8 +2162,6 @@ do_sprite_movement:
 					ror temp8
 				.endrepeat
 				lda temp8
-				;clc
-				;adc #1
 				sta temp8
 
 				
