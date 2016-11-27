@@ -1,4 +1,4 @@
-.define  		BUILD 			3035  
+.define  		BUILD 			3044  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Sun 11/27/2016  1:13" 
-.define 		SPLASH_MESSAGE 	"Not an RPG " 
+.define 		BUILD_DATE		"Sun 11/27/2016  2:09" 
+.define 		SPLASH_MESSAGE 	"Don't scary " 

@@ -3071,6 +3071,8 @@ seed_palette:
 	beq @aggressive
 	cmp #DIMENSION_ICE_AGE
 	beq @ice
+	cmp #DIMENSION_END_OF_DAYS
+	beq @eod
 
 	@default: 
 		store #0, currentPalette
@@ -3078,6 +3080,10 @@ seed_palette:
 
 	@ice:
 		store #2, currentPalette
+		rts
+
+	@eod:
+		store #3, currentPalette
 		rts
 
 	@aggressive:
@@ -3789,6 +3795,9 @@ fire_palettes:
 	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$09,$19,$0a,$31,$3d,$00,$30
 ice_palettes:
 	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$21,$30,$31,$31,$3d,$00,$30
+dark_palettes:
+	.byte $00,$0f,$07,$0f,$00,$0f,$0c,$0f,$00,$0f,$0b,$0f,$00,$3d,$00,$3d
+
 
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
