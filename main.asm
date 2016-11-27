@@ -395,14 +395,8 @@ jsr enable_all
 jmp show_title
 
 load_graphics_data: 
-	set_ppu_addr $3f00
-	ldy #0
-	@palette_loop:
-		lda default_palettes, y
-		sta PPU_DATA
-		iny
-		cpy #$10
-		bne @palette_loop
+
+	jsr load_palettes_for_dimension
 
 	set_ppu_addr $3f10
 	ldy #0
@@ -3075,9 +3069,15 @@ seed_palette:
 	lda currentDimension
 	cmp #DIMENSION_AGGRESSIVE
 	beq @aggressive
+	cmp #DIMENSION_ICE_AGE
+	beq @ice
 
 	@default: 
 		store #0, currentPalette
+		rts
+
+	@ice:
+		store #2, currentPalette
 		rts
 
 	@aggressive:
@@ -3087,11 +3087,14 @@ seed_palette:
 load_palettes_for_dimension:
 	txa
 	pha
+	tya
+	pha
 
-	ldx currentPalette
+	lda currentPalette
 	.repeat 4
 		asl
 	.endrepeat
+	tax
 
 	set_ppu_addr $3f00
 	ldy #0
@@ -3103,6 +3106,8 @@ load_palettes_for_dimension:
 		inx
 		cpy #16
 		bne @loop
+	pla
+	tay
 	pla
 	tax	 
 	rts
@@ -3651,6 +3656,11 @@ do_pause_screen:
 	jmp @loop_pause_screen
 
 	@escape_pause:
+		; Turn off 32 bit adding
+		lda ppuCtrlBuffer
+		and #%11111011
+		sta ppuCtrlBuffer
+
 		jsr disable_all
 		jsr vblank_wait
 		jsr load_palettes_for_dimension
@@ -3664,7 +3674,8 @@ do_pause_screen:
 		jsr sfx_play
 
 		jsr vblank_wait
-
+		
+		; Turn 32 bit adding back on.
 		lda ppuCtrlBuffer
 		ora #%00000100
 		sta ppuCtrlBuffer
@@ -3771,11 +3782,14 @@ menu_chr_data:
 
 	
 default_palettes: 
-	; Normal (and probably ice)
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$06,$19,$28,$31,$3d,$00,$30
+	; Normal
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$09,$29,$1a,$31,$3d,$00,$30
 	; fire-ized
 fire_palettes:
-	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$06,$19,$28,$31,$3d,$00,$30
+	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$09,$19,$0a,$31,$3d,$00,$30
+ice_palettes:
+	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$21,$30,$31,$31,$3d,$00,$30
+
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.byte $31,$27,$38,$0f,$31,$06,$16,$1a,$31,$01,$21,$31,$31,$09,$19,$29
