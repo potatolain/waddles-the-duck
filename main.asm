@@ -1993,6 +1993,7 @@ do_sprite_movement:
 			lda VAR_SPRITE_DATA, x
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+			bcs @go_remove
 			sec
 			sbc #HEADER_PIXEL_OFFSET
 			clc
@@ -2001,6 +2002,7 @@ do_sprite_movement:
 			sta temp6
 			cmp #0
 			bne @not_dead
+				@go_remove:
 				; The sprite has died. Uh oh.
 				jmp @remove
 			@not_dead:
