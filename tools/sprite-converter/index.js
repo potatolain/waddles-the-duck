@@ -15,6 +15,8 @@ var path = require('path'),
 	COLUMN_HEIGHT = 16,
 	NO_SPRITE = 0, // For now, the first sprite def is a noop/remove me from the screen.
 	SPRITE_START_ID = 256,
+	SPRITE_HIDDEN = 255,
+	TILE_QUESTION_BLOCK = 2,
 	NL = "\n",
 	
 	levelInfo, 
@@ -114,6 +116,7 @@ try {
 var width = levelInfo.width,
 	height = levelInfo.height,
 	data = levelInfo.layers[1].data,
+	tileData = levelInfo.layers[0].data,
 	originalSize = data.length,
 	rawColumns = [],
 	columnDefinitions = [],
@@ -126,12 +129,21 @@ for (var i = 0; i < data.length; i++) {
 	data[i]--;
 }
 
+// Need to look up some things in tiles, so do the same thing with tileData
+for (var i = 0; i < tileData.length; i++) {
+	tileData[i]--;
+}
+
 verbose('Map width: ' + width + ' height: ' + height);
 
 for (var y = 0; y < height; y++) {
 	for (var x = 0; x < width; x++) {
-		if (data[y*width + x] > 0) { // -1 = no tile at all. 1 = no sprites here. (This kind of implies we're doing weird stuff in tiled...')
-			spriteDefs.push({x: x, y: y, id: data[y*width + x] - SPRITE_START_ID});
+		var spriteData = 0;
+		if (data[y*width + x] > 0) { // -1 = no tile at all. 1 = no sprites here. (This kind of implies the zero-based thing might have been okay, making this weird..')
+			if (tileData[y*width + x] == TILE_QUESTION_BLOCK) {
+				spriteData = SPRITE_HIDDEN;
+			}
+			spriteDefs.push({x: x, y: y, id: data[y*width + x] - SPRITE_START_ID, data: spriteData});
 		}
 	}
 }
@@ -143,13 +155,14 @@ verbose('Beginning to generate file data.');
 fileData = 
 	'; Level sprite output for "' + lvlName + '"' + NL +
 	'; Generated on ' + (new Date()).toLocaleString() + ' by ' + packageData.name + ' version ' + packageData.version + NL +
+	'; Format is: x, y, id, data' + NL +
 	'; ' + NL + 
 	NL + 
 	NL + 
 	lvlName+'_sprites:' + NL;
 
 for (var i = 0; i < spriteDefs.length; i++) {
-	fileData += '	.byte ' + spriteDefs[i].x + ', ' + spriteDefs[i].y + ', ' + spriteDefs[i].id +', 0' + NL;
+	fileData += '	.byte ' + spriteDefs[i].x + ', ' + spriteDefs[i].y + ', ' + spriteDefs[i].id + ', ' + spriteDefs[i].data + NL;
 }
 
 fileData += 

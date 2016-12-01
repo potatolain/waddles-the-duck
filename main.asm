@@ -42,6 +42,7 @@
 	temp8:						.res 1
 	temp9:						.res 1
 	tempa:						.res 1
+	tempb:						.res 1
 	tempCollision:				.res 1 ; Yes, this is lame.
 	playerPosition:				.res 2
 	playerScreenPosition:		.res 1
@@ -62,6 +63,7 @@
 	lastCtrlButtons:			.res 1
 	playerVelocity:				.res 1
 	playerYVelocity:			.res 1
+	lastFramePlayerYVelocity:	.res 1
 	playerVelocityLockTime:		.res 1
 	flightTimer:				.res 1
 	playerDirection:			.res 1
@@ -73,6 +75,7 @@
 	warpDimensionB:				.res 1
 	warpIntersectY:				.res 1
 	tempCollisionTile:			.res 1
+	tempCollisionTilePos:		.res 1
 	currentLevel:				.res 1
 	lvlRowDataAddr:				.res 2
 	lvlDataAddr:				.res 2
@@ -86,6 +89,8 @@
 	gemCount:					.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
 	totalGemCount:				.res 1 ; So does this.
 	currentBank:				.res 1
+	arbitraryTileUpdateId:		.res 1
+	arbitraryTileUpdatePos:		.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -185,6 +190,7 @@
 	TILE_WATER_BENEATH		= 25
 	TILE_PLANT				= 26
 	TILE_ICE_BLOCK			= 27
+	TILE_QUESTION_BLOCK		= 2
 
 	TILE_LEVEL_END			= 51
 
@@ -215,6 +221,7 @@
 	SFX_HURT		= 8
 	SFX_MENU_DOWN	= 10
 	SFX_DEATH		= 11
+	SFX_BLOCK_HIT	= 12
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -260,6 +267,7 @@ SPRITE_DATA_ID						= 3
 SPRITE_DATA_DIRECTION 				= 5
 SPRITE_DATA_ANIM_STATE				= 5
 SPRITE_DATA_ALIVE					= 4
+SPRITE_DATA_TEMP_Y					= 4 ; HACK: Shared with alive - this is meaningless for collectible sprites, so we reuse the field.
 SPRITE_DATA_TILE_ID					= 6
 SPRITE_DATA_LVL_INDEX				= 7
 SPRITE_DATA_WIDTH					= 8
@@ -269,11 +277,14 @@ SPRITE_DATA_ANIM_TYPE				= 11
 SPRITE_DATA_TYPE					= 12
 SPRITE_DATA_LEVEL_DATA_POSITION 	= 13
 SPRITE_DATA_SPEED					= 14
+SPRITE_DATA_EXTRA					= 15
 
 SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
 SPRITE_DIRECTION_LEFT			= PLAYER_DIRECTION_LEFT
 SPRITE_DIRECTION_RIGHT 			= PLAYER_DIRECTION_RIGHT
+
+SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks. (Could also use the put-behind-background bit, but, eh..)
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Our Sound Settings
@@ -750,10 +761,7 @@ load_current_line:
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @carry_on_going_right
-		inc levelPosition
-		lda levelPosition
-		sta tempa
-		stx levelPosition
+		store levelPosition, tempa
 	@carry_on_going_right:
 	ldy #0
 	ldx #0
@@ -786,6 +794,16 @@ load_current_line:
 				and CURRENT_LEVEL_DATA, x
 				cmp #0
 				beq @dun_move_on
+					; Bit of a hack... if we detect this is a gem, show it anyway (so we can detect which question blocks are in which state efficiently)
+					iny
+					iny
+					lda (lvlSpriteDataAddr), y
+					dey
+					dey
+					cmp #SPRITE_TYPE_COLLECTIBLE
+					bne @really_move_on
+						jmp @dun_move_on
+					@really_move_on:
 					jmp @move_on_plx
 				@dun_move_on:
 
@@ -803,12 +821,17 @@ load_current_line:
 				asl
 				tax
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
-				sta macroTmp ; TODO: This is... bad form. Plain and simple. 
-				lda macroTmp
+				sta macroTmp ; TODO: This is... bad form. Plain and simple. Need it to compare y, below.
 				cmp #0
 				beq @not_covered ; Kind of a hack... your first sprite may get dupes, but this way we don't have to throw a bogus value in to start.
 				cpy macroTmp
 				bne @not_covered
+					; Okay, if you were a gem we have a little more work for you...
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE
+					cmp #SPRITE_TYPE_COLLECTIBLE
+					bne @not_gem
+						jsr remove_existing_gems_and_boxes
+					@not_gem:
 					plx
 					plx
 					; Escape. Escape.
@@ -845,6 +868,9 @@ load_current_line:
 			iny
 			lda (lvlSpriteDataAddr), y ; sprite id.
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
+			iny
+			lda (lvlSpriteDataAddr), y ; Extra data
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
 			lda #0
 			sta tempAddr+1
 			lda tempa
@@ -922,40 +948,30 @@ load_current_line:
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x 
 
 			ldx temp6
-			lda sprite_definitions+0, x
-			sta temp7
-			ldx currentSprite
-			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
-
-			ldx temp6
 			lda sprite_definitions+7, x
 			sta temp7
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 
+			ldx temp6
+			lda sprite_definitions+0, x
+			sta temp7
+			ldx currentSprite
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+
+
 			cmp #SPRITE_TYPE_COLLECTIBLE
 			bne @not_collectible
-				phxy
+
 					; TODO: It's painfully inefficient to do this here... we could stop building this up before we even started
 					; Also, I lied, that wasn't the last check. ;)
+						jsr remove_existing_gems_and_boxes
 
-					jsr get_bit_values_for_collectible
-					; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
-					and COLLECTIBLE_DATA, y
-					cmp #0
-					beq @dont_kill_the_sprite
-						plxy
-						phy
-						jsr remove_sprite
-						ply
-						jmp @not_collectible ; we already brought back our regs, so skip over the plxy
-					@dont_kill_the_sprite:
-				plxy
+						
 			@not_collectible:
 
 
-			; Skip @move_on because we increased y ourselves. Do it one more time to finish up, and one more for the padding byte.
-			iny
+			; Skip @move_on because we increased y ourselves. Do it one more time to finish up.
 			iny
 			pla
 			tax
@@ -1093,9 +1109,81 @@ draw_to_cache:
 	ldy temp0
 	
 	rts
+
+; Will remove any existing gem boxes. tempb is the offset of the sprite (since gems pop up on hit)
+remove_existing_gems_and_boxes:
+	phxy
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+	jsr get_bit_values_for_collectible
+	; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
+	and COLLECTIBLE_DATA, y
+	; Even if we take this out entirely, they reset on scroll off/on
+	cmp #0
+	beq @dont_kill_the_sprite
+		plxy
+
+		phy
+		jsr remove_sprite
+		; Build an address to update SCREEN_DATA
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TEMP_Y, x
+		sec
+		sbc #HEADER_PIXEL_OFFSET
+		and #%11110000
+		sta tempb
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		.repeat 4
+			lsr
+		.endrepeat
+		and #%00001111
+		ora tempb
+		sta tempb
+		tay
+		lda SCREEN_DATA, y
+		cmp #TILE_QUESTION_BLOCK
+		beq @found_it
+			; Didn't find it... okay, we might be one tile off on the y axis because the sprite moved. Reload and try again.
+			lda tempb
+			pha
+			and #%11110000
+			clc
+			adc #16
+			sta tempb
+			pla
+			and #%00001111
+			ora tempb
+			tay
+			lda SCREEN_DATA, y
+			cmp #TILE_QUESTION_BLOCK
+			bne @do_nothing
+			; Else fallthrough
+
+		@found_it:
+		lda #TILE_QUESTION_BLOCK+1
+		sta SCREEN_DATA, y
+
+		; Lastly, update next_row_cache. Thankfully we stored the Y pos in tempa, so we can just shift it down to find an index...
+		lda tempb
+		.repeat 4
+			lsr
+		.endrepeat
+		tay
+		lda #TILE_QUESTION_BLOCK+1
+		jsr draw_to_cache
+		@do_nothing:
+
+		ply
+		jmp @go_away
 	
-draw_current_nametable_row:
-	lda levelPosition
+	@dont_kill_the_sprite:
+	plxy
+	@go_away:
+
+	rts
+
+; Given a is a tile id, seed the 'nametableAddr' variable
+seed_nametable_addr:
+	sta temp1
 	and #%00001111
 	sta temp5
 	asl ; x2 because we want nametable addr, not map addr
@@ -1104,7 +1192,7 @@ draw_current_nametable_row:
 	sta nametableAddr
 	
 	; TODO: This feels kinda clumsy/inefficient. Is there a smarter way?
-	lda levelPosition
+	lda temp1
 	and #%00010000
 	lsr
 	lsr
@@ -1114,6 +1202,11 @@ draw_current_nametable_row:
 	clc
 	adc temp1
 	sta nametableAddr+1
+	rts
+	
+draw_current_nametable_row:
+	lda levelPosition
+	jsr seed_nametable_addr
 
 	
 	lda PPU_STATUS
@@ -1210,6 +1303,75 @@ draw_current_nametable_row:
 	
 	rts
 
+; Figure out whether a question block has already been hit and used by finding its gem. 
+; If it's not available, a will be 0.
+; If it is, a will be 1.
+; Y will be the index off of sprite_data 
+determine_if_question_block_taken:
+		ldy #0
+		@loop_sprites: 
+			lda (lvlSpriteDataAddr), y
+			cmp #$ff
+			beq @break_loop
+			iny
+			iny
+			iny
+			lda (lvlSpriteDataAddr), y
+			cmp #SPRITE_DATA_EXTRA_IS_HIDDEN
+			bne @definitely_not_it
+				; Okay, we know this is marked as hidden. But, is it "our" sprite? Need to calculate position for comparison.
+				dey
+				dey
+				lda (lvlSpriteDataAddr), y
+				; Y position of the sprite... asl this 4 times to get part of tile def
+				.repeat 4
+					asl
+				.endrepeat
+				sta temp9
+				dey
+				lda (lvlSpriteDataAddr), y ; X position of our sprite - includes bytes for which "screen" its on, so and em out
+				and #%00001111
+				ora temp9
+				cmp tempCollisionTilePos
+					beq @break_sprite_loop_success ; we found it!!
+				; eh, not so much.. go back to the state we were in
+				iny
+				iny
+				iny
+
+			@definitely_not_it:
+			iny
+			cpy #0
+			bne @loop_sprites
+	@break_loop:
+		lda #0
+		rts
+
+	@break_sprite_loop_success: 
+
+		; y is now equal to the sprite's LEVEL_DATA_POSITION. Time for... ANOTHER LOOP to find it.
+		sty temp9
+
+		ldy #0
+		@loop_extra_sprites:
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, y
+			cmp temp9
+			beq @break_extended_loop_success
+			tya
+			clc
+			adc #16
+			tay
+			cpy #0
+			bne @loop_extra_sprites
+		; If you get here, well, darn. No sprite for you.
+		lda #0
+		rts
+
+	@break_extended_loop_success:
+		lda #1
+		rts
+	rts
+
 do_special_tile_stuff:
 	lda tempCollisionTile
 	cmp #TILE_LEVEL_END
@@ -1221,6 +1383,53 @@ do_special_tile_stuff:
 		inc currentLevel
 		jmp show_ready
 	@not_eol:
+	cmp #TILE_QUESTION_BLOCK
+	beq @skip_question_block_slingshot
+		jmp @not_question_block
+	@skip_question_block_slingshot:
+		; only when going up...
+		lda lastFramePlayerYVelocity
+		cmp #PLAYER_VELOCITY_JUMPING
+		beq @were_in_this
+			jmp @not_question_block
+		@were_in_this:
+		; TODO: Test to make sure you're not coming at this from the side somehow. 
+		
+		; Calculate our expected location
+		phy
+
+		jsr determine_if_question_block_taken
+		cmp #0
+		beq @its_gone
+			; We actually found it. Set the extra byte to show it, and also update the tile to show it has been hit.
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, y
+			cmp #SPRITE_DATA_EXTRA_IS_HIDDEN
+			bne @its_gone ; Jumping up a bit... basically, your tile was already gotten, so get outta here.
+			lda #0
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, y
+
+			; Bump it up 1 tile so we can actually grab it.
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
+			sec
+			sbc #16
+			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
+
+			store tempCollisionTilePos,	 arbitraryTileUpdatePos
+			store #TILE_QUESTION_BLOCK+1, arbitraryTileUpdateId
+
+			phx
+			ldx #FT_SFX_CH0
+			lda #SFX_BLOCK_HIT
+			jsr sfx_play
+			plx
+
+		@its_gone:
+
+		; Okay, we're done.. put it all back
+		ply
+		; Intentional fallthrough
+
+	@not_question_block:
 	rts
 
 reset_collision_state:
@@ -1235,6 +1444,8 @@ do_collision_test:
 	sta tempCollision
 
 	cmp #TILE_LEVEL_END
+	beq @special_tile_collision
+	cmp #TILE_QUESTION_BLOCK
 	beq @special_tile_collision
 
 	cmp #0
@@ -1288,11 +1499,15 @@ do_collision_test:
 
 	@special_tile_collision:
 		store tempCollision, tempCollisionTile
-		lda #1
+		sty tempCollisionTilePos
+
+			lda #1
 		rts
 
 	@special_tile_no_collision:
-		store tempCollision, tempCollisionTile
+		sty tempCollisionTilePos
+
+			store tempCollision, tempCollisionTile
 		lda #0
 		rts
 
@@ -1549,6 +1764,7 @@ do_player_vertical_movement:
 	store #0, xScrollChange
 
 	lda playerYVelocity
+	sta lastFramePlayerYVelocity
 	cmp #0
 	bne @non_zero
 		store #PLAYER_VELOCITY_FALLING, playerYVelocity
@@ -2011,12 +2227,12 @@ do_sprite_movement:
 			and #%00001111
 			ora temp6
 
-			stx temp7
-			tax 
-			lda SCREEN_DATA, x
+			sty temp7
+			tay 
+			lda SCREEN_DATA, y
 			and #%00111111
-			ldx temp7
 			jsr do_collision_test
+			ldy temp7
 			cmp #0
 			bne @hit
 			
@@ -2036,12 +2252,12 @@ do_sprite_movement:
 			and #%00001111
 			ora temp6
 
-			stx temp7
-			tax
-			lda SCREEN_DATA, x
+			sty temp7
+			tay
+			lda SCREEN_DATA, y
 			and #%00111111
-			ldx temp7
 			jsr do_collision_test
+			ldy temp7
 			cmp #0
 			bne @hit
 				; Okay, we tested both sides... you didn't hit. GOING DOWN.
@@ -2097,12 +2313,12 @@ do_sprite_movement:
 				and #%00001111
 				ora temp6
 
-				stx temp7
-				tax 
-				lda SCREEN_DATA, x
+				sty temp7
+				tay 
+				lda SCREEN_DATA, y
 				and #%00111111
-				ldx temp7
 				jsr do_collision_test
+				ldy temp7
 				cmp #0
 				bne @hit_l
 				
@@ -2118,12 +2334,12 @@ do_sprite_movement:
 				and #%00001111
 				ora temp6
 
-				stx temp7
-				tax
-				lda SCREEN_DATA, x
+				sty temp7
+				tay
+				lda SCREEN_DATA, y
 				and #%00111111
-				ldx temp7
 				jsr do_collision_test
+				ldy temp7
 				cmp #0
 				bne @hit_l
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
@@ -2172,12 +2388,12 @@ do_sprite_movement:
 				and #%00001111
 				ora temp6
 
-				stx temp7
-				tax 
-				lda SCREEN_DATA, x
+				sty temp7
+				tay 
+				lda SCREEN_DATA, y
 				and #%00111111
-				ldx temp7
 				jsr do_collision_test
+				ldy temp7
 				cmp #0
 				bne @hit_r
 				
@@ -2193,12 +2409,12 @@ do_sprite_movement:
 				and #%00001111
 				ora temp6
 
-				stx temp7
-				tax
-				lda SCREEN_DATA, x
+				sty temp7
+				tay
+				lda SCREEN_DATA, y
 				and #%00111111
-				ldx temp7
 				jsr do_collision_test
+				ldy temp7
 				cmp #0
 				bne @hit_r
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
@@ -2301,6 +2517,11 @@ do_sprite_movement:
 				jsr draw_3x1_sprite_size
 				jmp @continue
 			@not_3x1:
+			cmp #SPRITE_SIZE_TINY
+			bne @not_tiny
+				jsr draw_tiny_sprite_size
+				jmp @continue
+			@not_tiny:
 				jsr draw_default_sprite_size
 				jmp @continue
 
@@ -2421,6 +2642,55 @@ draw_2x1_sprite_size:
 	sta VAR_SPRITE_DATA+5, x
 
 	rts
+	
+; x must be a sprite id, temp6 is animation, temp7 is direction
+draw_tiny_sprite_size: 
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+	cmp #SPRITE_DATA_EXTRA_IS_HIDDEN
+	bne @not_hidden
+		; Oh, you're hidden? Okay we can deal with you.
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+		rts
+	@not_hidden:
+	lda temp6
+	.repeat 4
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	asl
+	clc
+	adc temp6
+	sta temp6
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	clc
+	adc #4 ; You're half height; get on the floor; everybody do the dinosaur
+	sta VAR_SPRITE_DATA, x
+
+	lda #SPRITE_OFFSCREEN
+	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA+12, x
+	
+	lda temp1
+	sec
+	sbc temp2
+	clc
+	adc #4 ; Half width too? Get over there.
+	sta VAR_SPRITE_DATA+3, x
+
+	; Attrs for sprites set on spawn, then left alone.
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
+	sta VAR_SPRITE_DATA+1, x
+
+	rts
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_3x1_sprite_size: 
@@ -2533,6 +2803,7 @@ do_sprite_collision:
 		jsr remove_sprite		
 		phxy
 
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
 		jsr get_bit_values_for_collectible
 		; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
 		ora COLLECTIBLE_DATA, y
@@ -2591,10 +2862,9 @@ do_sprite_collision:
 	rts
 
 ; Gets the position of a collectible. Give it: 
-; x - the index off EXTENDED_SPRITE_DATA
+; a - the position of the sprite in the level.
 ; all registers will be destroyed. Push em if you need em.
 get_bit_values_for_collectible:
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
 	sta temp7
 	ldy #2
 	ldx #0
@@ -2789,6 +3059,16 @@ squish_sprite:
 ; Remove a sprite at position x (16-based) entirely from existance.
 remove_sprite:
 	; If you get here, we have collided.
+	tya
+	pha
+	; Back up your original y, in case we need it (mainly used for gem boxes)
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	cmp #0
+	beq @already_gone
+		; HACKY HJACKY HACKY HACKY HAAACK
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TEMP_Y, x
+	@already_gone:
+
 	lda #0
 	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	
@@ -2817,6 +3097,9 @@ remove_sprite:
 	ldy temp8
 	ora CURRENT_LEVEL_DATA, y
 	sta CURRENT_LEVEL_DATA, y
+
+	pla
+	tay
 	rts
 
 update_gem_count:
@@ -3486,8 +3769,20 @@ main_loop:
 		@do_draw:
 		jsr draw_current_nametable_row
 	@go_on:
+	
 	; If we're running out of cycles during vblank, this probably doesn't have to happen most of the time.
+
+	; Turn off 32 bit adding to do arbitrary graphical updates
+	lda ppuCtrlBuffer
+	and #%00001000
+	sta PPU_CTRL
+
 	jsr update_hud_gem_count
+	jsr update_arbitrary_tile
+
+	; Turn 32 bit adding back on.
+	lda ppuCtrlBuffer
+	sta PPU_CTRL
 
 	jsr do_sprite0
 
@@ -3515,6 +3810,89 @@ main_loop:
 
 
 	jmp main_loop
+
+update_arbitrary_tile:
+	; This is painfully inefficient for a method run during vblank... could easily pre-compute this during not-vblank if needed.
+	lda arbitraryTileUpdatePos
+	cmp #0
+	beq @no_update
+
+		; Get the real id for it...
+		lda arbitraryTileUpdateId
+		asl
+		sta arbitraryTileUpdateId
+
+		lda #0
+		sta tempAddr+1
+
+		lda arbitraryTileUpdatePos
+		and #%11110000
+		asl
+		rol tempAddr+1
+		asl
+		rol tempAddr+1
+		clc
+		adc #BOTTOM_HUD_TILE
+		sta tempAddr
+		lda tempAddr+1
+		adc #0
+		sta tempAddr+1 ; Deal with carry
+		
+		lda arbitraryTileUpdatePos
+		and #%00001111
+		asl
+		ora tempAddr
+		sta tempAddr
+		
+		lda tempAddr+1
+		clc
+		adc #$20 ; We want an offset on $20 for our nametable. (Or 24... but we'll get there; give it a moment)
+		sta tempAddr+1
+
+		lda ppuCtrlBuffer
+		and #%00000001
+		cmp #0
+		beq @dont_add_4
+			lda tempAddr+1
+			clc
+			adc #4
+			sta tempAddr+1
+		@dont_add_4:
+
+		lda PPU_STATUS
+		store tempAddr+1, PPU_ADDR
+		store tempAddr, PPU_ADDR
+		lda arbitraryTileUpdateId
+		sta PPU_DATA
+		clc
+		adc #1
+		sta PPU_DATA
+
+		; Now jump two lines and do it again.
+		lda PPU_STATUS
+		lda tempAddr
+		clc
+		adc #$20
+		sta tempAddr
+		lda tempAddr+1
+		adc #0
+		sta tempAddr+1
+		sta PPU_ADDR
+		store tempAddr, PPU_ADDR
+
+		lda arbitraryTileUpdateId
+		clc
+		adc #$10
+		sta PPU_DATA
+		adc #1
+		sta PPU_DATA
+
+
+		lda #0
+		sta arbitraryTileUpdatePos
+
+	@no_update:
+	rts
 
 clear_sprites:
 	ldx #0

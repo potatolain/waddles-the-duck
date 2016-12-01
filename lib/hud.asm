@@ -31,9 +31,6 @@ show_hud:
 	rts
 
 update_hud_gem_count: 
-	lda ppuCtrlBuffer
-	and #%00001000
-	sta PPU_CTRL
 
 	set_ppu_addr $2094
 	lda #GAME_TILE_A+6 ; G
@@ -106,10 +103,6 @@ update_hud_gem_count:
 		adc #GAME_TILE_0
 		sta PPU_DATA
 	.endif
-
-
-	lda ppuCtrlBuffer
-	sta PPU_CTRL
 
 
 rts
