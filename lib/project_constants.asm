@@ -1,4 +1,4 @@
-.define  		BUILD 			3304  
+.define  		BUILD 			3352  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Wed 11/30/2016 18:58" 
-.define 		SPLASH_MESSAGE 	"Does not contain the BFG9000    Or the BFG9001 " 
+.define 		BUILD_DATE		"Thu 12/01/2016 18:53" 
+.define 		SPLASH_MESSAGE 	"Bugs! Bugs as far as the eyes   can see! " 

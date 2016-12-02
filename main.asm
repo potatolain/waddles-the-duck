@@ -2437,7 +2437,7 @@ do_sprite_movement:
 			@skip_horizontal_movement:
 		@no_motion:
 
-		
+
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sec
 		sbc tempAddr
@@ -2451,8 +2451,24 @@ do_sprite_movement:
 
 		lda tempa
 		sbc tempAddr+1
+		; This is a workaround for a really obscure problem where when the player turns left in the first 1/4 of the first screen on a level, our sprites disappear. For some reason,
+		; the sprites are off by a factor of $10 in this one case. (And they don't appear to be set to SPRITE_OFFsCREEN. It likely relates to something strange with levelPosition
+		; when set by seed_level_position_l[_current] is run at this point, but I can't pinpoint the issue, and nothing else seems affected.
+		; TODO: Investigate this and find a real fix to the problem.
+		cmp #$ef
+		beq @edge_case
+		
 		cmp #0
-		bne @remove
+		beq @dont_remove
+			jmp @remove
+		@dont_remove:
+		jmp @past_edge_case
+		@edge_case:
+			lda temp1
+			sec
+			sbc #16
+			sta temp1
+		@past_edge_case:
 
 
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
