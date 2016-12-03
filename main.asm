@@ -63,6 +63,7 @@
 	lastCtrlButtons:			.res 1
 	playerVelocity:				.res 1
 	playerYVelocity:			.res 1
+	playerYVelocityNext:		.res 1
 	lastFramePlayerYVelocity:	.res 1
 	playerVelocityLockTime:		.res 1
 	flightTimer:				.res 1
@@ -1564,7 +1565,7 @@ test_vertical_collision:
 		jsr do_collision_test
 		cmp #0
 		beq @no_collision
-			store #0, playerYVelocity
+			store #0, playerYVelocityNext
 			jmp @no_collision
 
 	@going_up:
@@ -1590,7 +1591,7 @@ test_vertical_collision:
 		jsr do_collision_test
 		cmp #0
 		beq @no_collision
-			store #0, playerYVelocity
+			store #0, playerYVelocityNext
 			; jmp @no_collision ; Intentional fallthrough 
 
 	@no_collision:
@@ -1765,9 +1766,11 @@ do_player_vertical_movement:
 
 	lda playerYVelocity
 	sta lastFramePlayerYVelocity
+	sta playerYVelocityNext
 	cmp #0
 	bne @non_zero
 		store #PLAYER_VELOCITY_FALLING, playerYVelocity
+		sta playerYVelocityNext
 	@non_zero:
 
 	; Test 3 positions... left, middle, right. Middle because we're fatter than a single tile, and you could otherwise land right between two tiles.
@@ -1788,6 +1791,11 @@ do_player_vertical_movement:
 	; We shifted you.. now repeat. 
 	jsr test_vertical_collision
 
+	lda tempCollisionTile
+	pha
+	lda tempCollisionTilePos
+	pha
+
 	; right
 	lda playerPosition
 	clc
@@ -1800,8 +1808,22 @@ do_player_vertical_movement:
 	; We shifted you.. now repeat. 
 	jsr test_vertical_collision
 
+	; If the middle hit counted, use it instead of anything we just found.
+	pla 
+	cmp #0
+	beq @do_nothing
+		; You had a value before... bring it back
+		sta tempCollisionTilePos
+		pla
+		sta tempCollisionTile
+		jmp @after_doing_nothing
+	@do_nothing: 
+	pla
+	@after_doing_nothing:
+
 	
-	lda playerYVelocity
+	lda playerYVelocityNext
+	sta playerYVelocity
 	cmp #0
 	bne @carry_on
 		rts
