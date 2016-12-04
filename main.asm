@@ -75,6 +75,7 @@
 	warpDimensionA:				.res 1
 	warpDimensionB:				.res 1
 	warpIntersectY:				.res 1
+	warpedThisCycle:			.res 1
 	tempCollisionTile:			.res 1
 	tempCollisionTilePos:		.res 1
 	currentLevel:				.res 1
@@ -1612,6 +1613,7 @@ test_vertical_collision:
 		cmp temp1
 		bne @not_warp
 			store #1, warpIntersectY
+			jmp @done_warp
 		@not_warp:
 		.repeat 3
 			iny
@@ -1639,13 +1641,17 @@ test_horizontal_collision:
 	sta temp2
 
 	; temp1 is the position within the level being tested.
-	lda #DIMENSION_INVALID
-	sta warpDimensionA
-	sta warpDimensionB
 
 	lda warpIntersectY
 	cmp #0
 	beq @done_warp
+	lda warpedThisCycle
+	cmp #0
+	bne @done_warp ; we already did it... do nothing.
+
+	lda #DIMENSION_INVALID
+	sta warpDimensionA
+	sta warpDimensionB
 
 	ldy #0
 	@loop_warp:
@@ -1662,10 +1668,16 @@ test_horizontal_collision:
 			adc #1
 			cmp temp1
 			beq @do_warp
+			adc #1
+			cmp temp1
+			beq @do_warp
 			jmp @after_tests
 		@left: 
 			lda (warpDataAddr), y
 			sec
+			sbc #1
+			cmp temp1
+			beq @do_warp
 			sbc #1
 			cmp temp1
 			beq @do_warp
@@ -1695,6 +1707,7 @@ test_horizontal_collision:
 		jmp @done_warp
 
 		@do_warp_color:
+		store #1, warpedThisCycle
 
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
@@ -1703,7 +1716,7 @@ test_horizontal_collision:
 		jmp @done_warp
 
 
-	@color_warp: 
+	@color_warp: ; Turns off any tinting we might have added.
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
 		ora currentDimension
@@ -1899,7 +1912,9 @@ do_player_movement:
 		sta tempPlayerScreenPosition
 	@after_move:
 
-	store #0, temp3
+	lda #0
+	sta temp3
+	sta warpedThisCycle
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	beq @collision_left
@@ -4207,14 +4222,14 @@ menu_chr_data:
 	
 default_palettes: 
 	; Normal
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$09,$29,$1a,$31,$3d,$00,$30
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$16,$29,$1a,$31,$3d,$00,$30
 	; fire-ized
 fire_palettes:
-	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$09,$19,$0a,$31,$3d,$00,$30
+	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$16,$19,$0a,$31,$3d,$00,$30
 ice_palettes:
-	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$21,$30,$31,$31,$3d,$00,$30
+	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$06,$30,$31,$31,$3d,$00,$30
 dark_palettes:
-	.byte $00,$0f,$07,$0f,$00,$0f,$0c,$0f,$00,$0f,$0b,$0f,$00,$3d,$00,$3d
+	.byte $00,$0f,$07,$0f,$00,$0f,$0c,$0f,$00,$06,$0b,$0f,$00,$3d,$00,$3d
 
 
 default_sprite_palettes: ; Drawn at same time as above.
