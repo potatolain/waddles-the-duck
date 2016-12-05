@@ -7,5 +7,4 @@
 lvl1_warp_points: 
 	; Format: x, y, dim1, dim2
 	.byte 7, 10, DIMENSION_PLAIN, DIMENSION_AGGRESSIVE
-	.byte 127, 10, DIMENSION_AGGRESSIVE, DIMENSION_ICE_AGE
 	.byte $ff

@@ -77,10 +77,13 @@ convert_levels: $(LEVELS)
 convert_sprites: $(SPRITES)
 
 build: 
-	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes ../main.asm
+	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes -Wa "-D DEBUGGING=1" ../main.asm
+
+build_release:
+	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes -Wa "-D DEBUGGING=0" ../main.asm
 	
 build_debug:
-	cd bin && ca65 -g -o main.o ../main.asm
+	cd bin && ca65 -g -o main.o ../main.asm -D DEBUGGING=1
 	cd bin && ld65 -o main.nes --config $(CONFIG_FILE) --dbgfile main.nes.dbg main.o
 
 fceux:
@@ -104,7 +107,10 @@ endif
 space_check:
 	$(SPACE_CHECKER) bin/main.nes
 
-upload: 
+release: build_release run uploader
+
+# TODO: Rename this to upload once you get used to not running it directly.
+uploader: 
 	$(UPLOADER) bin/main.nes
 
 clean: 

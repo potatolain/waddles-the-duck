@@ -77,32 +77,4 @@ update_hud_gem_count:
 	adc #GAME_TILE_0
 	sta PPU_DATA
 
-	.if DEBUGGING = 1
-		set_ppu_addr $2030
-		lda #GAME_TILE_A+22 ; w
-		sta PPU_DATA
-		lda #GAME_TILE_A+12 ; m
-		sta PPU_DATA
-		lda #GAME_TILE_0-3
-		sta PPU_DATA
-		lda #0
-		sta PPU_DATA
-
-
-		lda watchme
-		and #%00001111
-		clc
-		adc #GAME_TILE_0
-		sta PPU_DATA
-
-		lda watchme
-		.repeat 4
-			lsr
-		.endrepeat
-		clc
-		adc #GAME_TILE_0
-		sta PPU_DATA
-	.endif
-
-
 rts

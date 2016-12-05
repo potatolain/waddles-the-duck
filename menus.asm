@@ -99,6 +99,19 @@ load_title:
 		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
 		write_string SPLASH_MESSAGE, $2361, $1e
 	.endif
+
+	.if DEBUGGING = 1
+		set_ppu_addr $2300
+		ldx #$20
+		lda #$ff
+		@loop_clear2:
+			sta PPU_DATA
+			dex
+			cpx #0
+			bne @loop_clear2
+		
+		write_string .sprintf("Debug mode enabled"), $2301, 
+	.endif
 	
 	jsr enable_all
 	reset_ppu_scrolling

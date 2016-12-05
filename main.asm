@@ -192,6 +192,7 @@
 	TILE_WATER_BENEATH		= 25
 	TILE_PLANT				= 26
 	TILE_ICE_BLOCK			= 27
+	TILE_FLOWER				= 29
 	TILE_QUESTION_BLOCK		= 2
 
 	TILE_LEVEL_END			= 51
@@ -295,7 +296,6 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	DEBUGGING			= 0
 	
 .segment "STUB"
 	resetstub:
@@ -1481,6 +1481,8 @@ do_collision_test:
 		beq @no_collision
 		cmp #TILE_ICE_BLOCK
 		beq @no_collision
+		cmp #TILE_FLOWER
+		beq @no_collision
 		jmp @collision
 
 
@@ -1493,10 +1495,14 @@ do_collision_test:
 		beq @no_collision
 		cmp #TILE_ICE_BLOCK
 		beq @no_collision
+		cmp #TILE_FLOWER
+		beq @no_collision
 		jmp @collision
 
 	@ice_age:
 		; Pretty much everything is a collision! Ice is a PITA...
+		lda #TILE_FLOWER
+		beq @no_collision
 		jmp @collision
 
 	@special_tile_collision:
@@ -4195,7 +4201,16 @@ nmi:
 	
 .segment "BANK0"
 banktable
-	
+
+.if DEBUGGING = 1
+
+	lvldebug:
+		.include "levels/lvl_debug_meta.asm"
+		.include "levels/processed/lvl_debug_tiles.asm"
+		.include "levels/processed/lvl_debug_sprites.asm"
+
+.endif
+
 lvl1:
 	.include "levels/lvl1_meta.asm"
 	.include "levels/processed/lvl1_tiles.asm"
@@ -4206,8 +4221,12 @@ lvl2:
 	.include "levels/processed/lvl2_tiles.asm"
 	.include "levels/processed/lvl2_sprites.asm"
 
-leveldata_table: 
-	.word lvl1, lvl2
+leveldata_table:
+	.if DEBUGGING = 1 
+		.word lvldebug, lvl1, lvl2
+	.else
+		.word lvl1, lvl2
+	.endif
 
 
 default_chr:
