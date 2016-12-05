@@ -194,6 +194,7 @@
 	TILE_ICE_BLOCK			= 27
 	TILE_FLOWER				= 29
 	TILE_QUESTION_BLOCK		= 2
+	TILE_CLOUD				= 28
 
 	TILE_LEVEL_END			= 51
 
@@ -1466,6 +1467,8 @@ do_collision_test:
 	bcs @collision
 
 	lda currentDimension
+	cmp #DIMENSION_CALM
+	beq @calm
 	cmp #DIMENSION_AGGRESSIVE
 	beq @fire
 	cmp #DIMENSION_AUTUMN
@@ -1497,6 +1500,8 @@ do_collision_test:
 		beq @no_collision
 		cmp #TILE_FLOWER
 		beq @no_collision
+		cmp #TILE_CLOUD
+		beq @no_collision
 		jmp @collision
 
 	@ice_age:
@@ -1504,6 +1509,12 @@ do_collision_test:
 		lda #TILE_FLOWER
 		beq @no_collision
 		jmp @collision
+
+	@calm:
+		lda tempCollision
+		cmp #TILE_CLOUD
+		beq @no_collision
+		jmp @default ;
 
 	@special_tile_collision:
 		store tempCollision, tempCollisionTile
@@ -3417,6 +3428,8 @@ seed_palette:
 	beq @ice
 	cmp #DIMENSION_END_OF_DAYS
 	beq @eod
+	cmp #DIMENSION_CALM
+	beq @calm
 
 	@default: 
 		store #0, currentPalette
@@ -3428,6 +3441,10 @@ seed_palette:
 
 	@eod:
 		store #3, currentPalette
+		rts
+
+	@calm: 
+		store #4, currentPalette
 		rts
 
 	@aggressive:
@@ -4249,6 +4266,8 @@ ice_palettes:
 	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$06,$30,$31,$31,$3d,$00,$30
 dark_palettes:
 	.byte $00,$0f,$07,$0f,$00,$0f,$0c,$0f,$00,$06,$0b,$0f,$00,$3d,$00,$3d
+calm_palettes:
+	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$16,$29,$1a,$31,$3d,$00,$31
 
 
 default_sprite_palettes: ; Drawn at same time as above.
