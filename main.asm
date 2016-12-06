@@ -119,9 +119,9 @@
 	PLAYER_VELOCITY_NORMAL 		= $01
 	PLAYER_VELOCITY_FAST		= $02
 	PLAYER_VELOCITY_FALLING		= $02
-	PLAYER_VELOCITY_JUMPING		= $ff-$02 ; rotato! (Make it pseudo negative to wrap around.)
-	PLAYER_JUMP_TIME_RUN		= $14
-	PLAYER_JUMP_TIME			= $10
+	PLAYER_VELOCITY_JUMPING		= $100-$02 ; rotato! (Make it pseudo negative to wrap around.)
+	PLAYER_JUMP_TIME_RUN		= $1c
+	PLAYER_JUMP_TIME			= $18
 	HOP_LOCK_TIME				= $6
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
@@ -1653,6 +1653,8 @@ test_horizontal_collision:
 		lda PLAYER_SPRITE ; Grab top of top sprite.
 		sec
 		sbc #HEADER_PIXEL_OFFSET ; remove header
+		clc
+		adc #2 ; Little bit of buffer so that the player can fit under sprites, despite being 16 px tall.
 
 		and #%11110000 ; align with 16
 
