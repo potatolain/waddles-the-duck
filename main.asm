@@ -74,15 +74,13 @@
 	currentPalette:				.res 1
 	warpDimensionA:				.res 1
 	warpDimensionB:				.res 1
-	warpIntersectY:				.res 1
-	warpedThisCycle:			.res 1
+	isInWarpZone:				.res 1
 	tempCollisionTile:			.res 1
 	tempCollisionTilePos:		.res 1
 	currentLevel:				.res 1
 	lvlRowDataAddr:				.res 2
 	lvlDataAddr:				.res 2
 	lvlSpriteDataAddr:			.res 2
-	warpDataAddr:				.res 2
 	paletteAddr:				.res 2
 	currentSprite:				.res 1
 	xScrollChange:				.res 1
@@ -530,15 +528,6 @@ load_level:
 	iny
 	lda (tempAddr), y
 	sta lvlSpriteDataAddr+1
-
-	lda tempAddr
-	clc
-	adc #10
-	sta warpDataAddr
-	lda tempAddr+1
-	adc #0
-	sta warpDataAddr+1
-
 
 	; Prep nametableAddr with the position we should start on nametable 2
 	lda #BOTTOM_HUD_TILE
@@ -1614,30 +1603,6 @@ test_vertical_collision:
 
 	@no_collision:
 
-	; Test warp collision, too. temp1 is our y
-	lda temp1
-	.repeat 4
-		lsr
-	.endrepeat
-	sta temp1
-	ldy #0
-	@loop_warp:
-		lda (warpDataAddr), y
-		cmp #$ff
-		beq @done_warp
-		iny
-		lda (warpDataAddr), y
-		cmp temp1
-		bne @not_warp
-			store #1, warpIntersectY
-			jmp @done_warp
-		@not_warp:
-		.repeat 3
-			iny
-		.endrepeat
-
-	@done_warp:
-
 
 	rts
 
@@ -1658,88 +1623,6 @@ test_horizontal_collision:
 	sta temp2
 
 	; temp1 is the position within the level being tested.
-
-	lda warpIntersectY
-	cmp #0
-	beq @done_warp
-	lda warpedThisCycle
-	cmp #0
-	bne @done_warp ; we already did it... do nothing.
-
-	lda #DIMENSION_INVALID
-	sta warpDimensionA
-	sta warpDimensionB
-
-	ldy #0
-	@loop_warp:
-		lda (warpDataAddr), y
-		cmp #$ff
-		beq @color_warp
-		cmp temp1
-		beq @do_warp
-		lda playerDirection
-		cmp #PLAYER_DIRECTION_RIGHT
-		bne @left
-			lda (warpDataAddr), y
-			clc
-			adc #1
-			cmp temp1
-			beq @do_warp
-			adc #1
-			cmp temp1
-			beq @do_warp
-			jmp @after_tests
-		@left: 
-			lda (warpDataAddr), y
-			sec
-			sbc #1
-			cmp temp1
-			beq @do_warp
-			sbc #1
-			cmp temp1
-			beq @do_warp
-			; fallthru
-		@after_tests:
-
-		.repeat 4 
-			iny
-		.endrepeat
-		jmp @loop_warp
-
-	@do_warp:
-		; its a warp, and we already hit y. Let's do it
-		iny
-		iny
-		lda (warpDataAddr), y
-		sta warpDimensionA
-		iny
-		lda (warpDataAddr), y
-		sta warpDimensionB
-
-		lda currentDimension
-		cmp warpDimensionA
-		beq @do_warp_color
-		cmp warpDimensionB
-		beq @do_warp_color
-		jmp @done_warp
-
-		@do_warp_color:
-		store #1, warpedThisCycle
-
-		lda ppuMaskBuffer
-		and #DIMENSION_MASK^255
-		ora #DIMENSION_FADE
-		sta ppuMaskBuffer
-		jmp @done_warp
-
-
-	@color_warp: ; Turns off any tinting we might have added.
-		lda ppuMaskBuffer
-		and #DIMENSION_MASK^255
-		ora currentDimension
-		sta ppuMaskBuffer
-
-	@done_warp:
 
 	lda temp3
 	cmp #1
@@ -1931,7 +1814,6 @@ do_player_movement:
 
 	lda #0
 	sta temp3
-	sta warpedThisCycle
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	beq @collision_left
@@ -2218,6 +2100,8 @@ do_sprite_movement:
 
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 		cmp #SPRITE_TYPE_COLLECTIBLE
+		beq @go_no_motion
+		cmp #SPRITE_TYPE_DIMENSIONER
 		beq @go_no_motion
 			
 			; Don't bother calculating gravity if the sprite isn't visible.
@@ -2592,6 +2476,11 @@ do_sprite_movement:
 				jsr draw_tiny_sprite_size
 				jmp @continue
 			@not_tiny:
+			cmp #SPRITE_SIZE_TINY_NORMAL_ALIGNMENT
+			bne @not_tiny_ish
+				jsr draw_tiny_aligned_sprite_size
+				jmp @continue
+			@not_tiny_ish:
 				jsr draw_default_sprite_size
 				jmp @continue
 
@@ -2763,6 +2652,41 @@ draw_tiny_sprite_size:
 	rts
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
+draw_tiny_aligned_sprite_size: 
+	lda temp6
+	.repeat 4
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	asl
+	clc
+	adc temp6
+	sta temp6
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	sta VAR_SPRITE_DATA, x
+
+	lda #SPRITE_OFFSCREEN
+	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA+12, x
+	
+	lda temp1
+	sec
+	sbc temp2
+	sta VAR_SPRITE_DATA+3, x
+
+	; Attrs for sprites set on spawn, then left alone.
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
+	sta VAR_SPRITE_DATA+1, x
+
+	rts
+
+
+; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_3x1_sprite_size: 
 	lda temp6
 	.repeat 4
@@ -2928,6 +2852,16 @@ do_sprite_collision:
 	bne @not_invuln
 		jmp do_player_death
 	@not_invuln:
+	cmp #SPRITE_TYPE_DIMENSIONER
+	bne @not_dimensioner
+		; This thing transports us between dimensions... mark it up.
+		store #1, isInWarpZone
+		; Little bit of funky, dirty code here. We store dimension A in the palette id, and b in the speed. 
+		lda VAR_SPRITE_DATA+2, x
+		sta warpDimensionA
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
+		sta warpDimensionB
+	@not_dimensioner:
 
 	rts
 
@@ -3815,13 +3749,17 @@ do_dimensional_transfer:
 main_loop: 
 
 	jsr handle_main_input
-	store #0, warpIntersectY ; reset warp intersection data. (TODO: This isn't the clearest thing ever written...)
+	lda #0
+	sta isInWarpZone
+	sta warpDimensionA
+	sta warpDimensionB
 	jsr reset_collision_state
 	jsr do_player_vertical_movement
 	jsr do_player_movement
 	jsr do_special_tile_stuff
 	jsr do_sprite_movement
 	jsr test_sprite_collision
+	jsr update_buffer_for_warp_zone
 	jsr sound_update
 
 	jsr vblank_wait
@@ -3886,6 +3824,24 @@ main_loop:
 
 
 	jmp main_loop
+
+update_buffer_for_warp_zone:
+	lda isInWarpZone
+	cmp #0
+	bne @its_a_warp
+		; Not a warp :(
+		lda ppuMaskBuffer
+		and #DIMENSION_MASK^255
+		ora currentDimension
+		sta ppuMaskBuffer
+		rts
+	@its_a_warp:
+		; It's a warp!
+		lda ppuMaskBuffer
+		and #DIMENSION_MASK^255
+		ora #DIMENSION_FADE
+		sta ppuMaskBuffer
+		rts
 
 update_arbitrary_tile:
 	; This is painfully inefficient for a method run during vblank... could easily pre-compute this during not-vblank if needed.
