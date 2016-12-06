@@ -3833,18 +3833,28 @@ main_loop:
 update_buffer_for_warp_zone:
 	lda isInWarpZone
 	cmp #0
-	bne @its_a_warp
+	beq @restore_original_colors
+		; It's a warp! but is it ours?
+		lda currentDimension
+		cmp warpDimensionA
+		beq @its_definitely_a_warp
+		cmp warpDimensionB
+		beq @its_definitely_a_warp
+		jmp @restore_original_colors
+
+	@its_definitely_a_warp: 
+		; party time
+		lda ppuMaskBuffer
+		and #DIMENSION_MASK^255
+		ora #DIMENSION_FADE
+		sta ppuMaskBuffer
+		rts
+
+	@restore_original_colors:
 		; Not a warp :(
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
 		ora currentDimension
-		sta ppuMaskBuffer
-		rts
-	@its_a_warp:
-		; It's a warp!
-		lda ppuMaskBuffer
-		and #DIMENSION_MASK^255
-		ora #DIMENSION_FADE
 		sta ppuMaskBuffer
 		rts
 
