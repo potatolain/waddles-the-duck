@@ -3602,6 +3602,11 @@ draw_switchable_tiles:
 
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
 do_dimensional_transfer:
+	lda isInWarpZone
+	cmp #0
+	bne @maybe_doit
+		rts
+	@maybe_doit:
 
 	lda warpDimensionA
 	cmp currentDimension
