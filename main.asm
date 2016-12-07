@@ -133,6 +133,7 @@
 	HEADER_PIXEL_OFFSET			= 48
 	SPRITE_HEIGHT_OFFSET		= 8
 	SPRITE_VELOCITY_NORMAL		= 1 ; This trips every other frame, so multiply accordinly.
+	SPRITE_X_CUTOFF 			= 244
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
@@ -2452,7 +2453,6 @@ do_sprite_movement:
 			@not_normal:
 			@after_anim:
 
-
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			cmp #0 ; Last chance, GET OUT
 			beq @remove
@@ -2564,6 +2564,25 @@ test_sprite_collision:
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_2x1_sprite_size: 
+	
+	lda temp1
+	sec
+	sbc temp2
+	cmp #SPRITE_X_CUTOFF
+	bcc @dont_kill_the_sprite
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+		rts
+	@dont_kill_the_sprite:
+	sta VAR_SPRITE_DATA+3, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+
+	
 	lda temp6
 	.repeat 4
 		asl
@@ -2584,14 +2603,6 @@ draw_2x1_sprite_size:
 	sta VAR_SPRITE_DATA+8, x
 	sta VAR_SPRITE_DATA+12, x
 	
-	lda temp1
-	sec
-	sbc temp2
-	sta VAR_SPRITE_DATA+3, x
-	clc
-	adc #8
-	sta VAR_SPRITE_DATA+7, x
-
 	; Attrs for sprites set on spawn, then left alone.
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
@@ -2617,6 +2628,26 @@ draw_tiny_sprite_size:
 		sta VAR_SPRITE_DATA+12, x
 		rts
 	@not_hidden:
+
+	; Without a doubt, this is imperfect. It hides sprites that would wrap and show on the right of the screen instead of disappearing.
+	; TODO: Figure out what's wrong with the math here, and make sprites appear at the same time terrain does.
+	lda temp1
+	sec
+	sbc temp2
+	clc
+	adc #4 ; Half width too? Get over there.
+	cmp #SPRITE_X_CUTOFF
+	bcc @dont_kill_the_sprite
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+		rts
+	@dont_kill_the_sprite:
+	sta VAR_SPRITE_DATA+3, x
+
+
 	lda temp6
 	.repeat 4
 		asl
@@ -2635,14 +2666,7 @@ draw_tiny_sprite_size:
 	lda #SPRITE_OFFSCREEN
 	sta VAR_SPRITE_DATA+4, x
 	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x
-	
-	lda temp1
-	sec
-	sbc temp2
-	clc
-	adc #4 ; Half width too? Get over there.
-	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+12, x	
 
 	; Attrs for sprites set on spawn, then left alone.
 
@@ -2690,6 +2714,28 @@ draw_tiny_aligned_sprite_size:
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_3x1_sprite_size: 
+	
+	lda temp1
+	sec
+	sbc temp2
+	cmp #SPRITE_X_CUTOFF
+	bcc @dont_kill_the_sprite
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+		rts
+	@dont_kill_the_sprite:
+	sta VAR_SPRITE_DATA+3, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+11, x
+
+	
 	lda temp6
 	.repeat 4
 		asl
@@ -2712,17 +2758,6 @@ draw_3x1_sprite_size:
 	lda #SPRITE_OFFSCREEN
 	sta VAR_SPRITE_DATA+12, x
 	
-	lda temp1
-	sec
-	sbc temp2
-	sta VAR_SPRITE_DATA+3, x
-	clc
-	adc #8
-	sta VAR_SPRITE_DATA+7, x
-	clc
-	adc #8
-	sta VAR_SPRITE_DATA+11, x
-
 	; Attrs for sprites set on spawn, then left alone.
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
@@ -2740,6 +2775,29 @@ draw_3x1_sprite_size:
 
 
 draw_default_sprite_size:
+
+	lda temp1
+	sec
+	sbc temp2
+
+	cmp #SPRITE_X_CUTOFF
+	bcc @dont_kill_the_sprite
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, x
+		sta VAR_SPRITE_DATA+4, x
+		sta VAR_SPRITE_DATA+8, x
+		sta VAR_SPRITE_DATA+12, x
+		rts
+	@dont_kill_the_sprite:
+
+	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+11, x
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, x
+	sta VAR_SPRITE_DATA+15, x
+
+
 	lda temp6
 	.repeat 5
 		asl
@@ -2758,15 +2816,6 @@ draw_default_sprite_size:
 	adc #8
 	sta VAR_SPRITE_DATA+8, x
 	sta VAR_SPRITE_DATA+12, x
-	lda temp1
-	sec
-	sbc temp2
-	sta VAR_SPRITE_DATA+3, x
-	sta VAR_SPRITE_DATA+11, x
-	clc
-	adc #8
-	sta VAR_SPRITE_DATA+7, x
-	sta VAR_SPRITE_DATA+15, x
 
 	; Attrs for sprites set on spawn, then left alone.
 
