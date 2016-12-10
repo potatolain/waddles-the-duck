@@ -296,6 +296,14 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
+	BASE_NUMBER_OF_LEVELS = 2
+
+; Debugging level has to count if we're debugging, and thus included it.
+.if DEBUGGING = 1
+	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS+1
+.else
+	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS
+.endif
 	
 .segment "STUB"
 	resetstub:
@@ -1373,7 +1381,7 @@ do_special_tile_stuff:
 		; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
 		ldx #$ff
 		txs
-		inc currentLevel
+		jsr do_next_level
 		jmp show_ready
 	@not_eol:
 	cmp #TILE_QUESTION_BLOCK
@@ -4165,6 +4173,14 @@ do_pause_screen:
 		sta ppuCtrlBuffer
 		jsr enable_all
 		rts
+do_next_level:
+	inc currentLevel
+	lda currentLevel
+	cmp #NUMBER_OF_LEVELS
+	bne @just_go
+		jsr game_end
+	@just_go:
+	rts
 	
 disable_all:
 	ldx #$00

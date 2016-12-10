@@ -180,3 +180,51 @@ show_ready:
 
 	game_time: 
 		jmp show_level
+
+
+
+game_end:
+	; Clear out buttons in case you already hit start for some screwy reason.
+	lda #0
+	sta ctrlButtons
+	sta lastCtrlButtons
+	sta scrollX
+	sta scrollY
+	jsr load_menu
+	; Alignment test... quotes contain 30 spaces (assuming a 1 tile border)
+	; __________ "                              "
+	write_string "Congratulations!", $2047
+	write_string "You have completed Waddles the", $20a1
+	write_string "Duck. You must be awesome!", $20c1
+	write_string "Created as part of", $2121
+	write_string "The 2016 NESDEV Compo", $2141
+	write_string "code/art/music by: cppchriscpp", $21a1
+	write_string "Inspired by Eversion", $2201
+	write_string "Thanks for playing!", $22a6
+	write_string "No ducks were harmed in the", $2362
+	write_string "Making of this NES game", $2382
+	jsr enable_all
+	jsr vblank_wait
+
+	; TODO: I need some ducks man (Add some sprites, or otherwise pretty this up. Make the thank you look nicer, if nothing else!)
+	; TODO: Ending theme
+	; TODO: Colorize?
+	@loop:
+		jsr read_controller
+		jsr sound_update
+		reset_ppu_scrolling
+		jsr vblank_wait
+		reset_ppu_scrolling
+
+		; Make sure we don't count keypresses from last cycle.
+		lda lastCtrlButtons
+		eor #$ff ; flip the bits.
+		and ctrlButtons
+		
+		and #CONTROLLER_START
+		bne @go_reset
+		jmp @loop
+
+
+	@go_reset:
+		jmp reset ; Welp, it was nice knowing you...
