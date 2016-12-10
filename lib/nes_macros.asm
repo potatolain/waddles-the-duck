@@ -68,6 +68,8 @@
 			char .set NUM_SYM_TABLE_START + $0a
 		.elseif (char = '!')
 			char .set NUM_SYM_TABLE_START + $0b
+		.elseif (char = '?')
+			char .set NUM_SYM_TABLE_START + $0e
 		.elseif (char = '^')
 			char .set CHAR_TABLE_START + $1d
 		.elseif (char = '_')
