@@ -1878,14 +1878,14 @@ do_player_movement:
 	beq @fast
 	cmp #256-PLAYER_VELOCITY_FAST
 	beq @fast
-		; slow; 1px per scanline
+		; slow; 1px per vblank
 		lda playerPosition
 		and #%00001111
 		cmp #0
 		bne @not_scrollin
 		jmp @scrollit
 	@fast: 
-		; fast; 2px per scanline
+		; fast; 2px per vblank
 		lda playerPosition
 		and #%00001110
 		cmp #0
@@ -2190,7 +2190,7 @@ do_sprite_movement:
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
 			sta temp8
-			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 			adc #0
 			sta temp7
 			.repeat 4
@@ -2242,8 +2242,11 @@ do_sprite_movement:
 				; We're goin left!
 				; Start of left/right logic
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+				sec
+				sbc #SPRITE_VELOCITY_NORMAL
 				sta temp8
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+				sbc #0
 				sta temp7
 				.repeat 4
 					lsr temp7
@@ -2254,7 +2257,8 @@ do_sprite_movement:
 				lda VAR_SPRITE_DATA, x
 				sec
 				sbc #HEADER_PIXEL_OFFSET
-				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				sec
+				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
 				and #%11110000
 				sta temp6
 
@@ -2277,6 +2281,7 @@ do_sprite_movement:
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
 				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+				and #%11110000
 				sta temp6
 
 				lda temp8 ; X Position doesn't change... just re-use it.
@@ -2317,6 +2322,13 @@ do_sprite_movement:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 				adc #0
 				sta temp7
+				lda temp8
+				clc
+				adc #SPRITE_VELOCITY_NORMAL
+				sta temp8
+				lda temp7
+				adc #0
+				sta temp7
 
 				.repeat 4
 					lsr temp7
@@ -2329,7 +2341,7 @@ do_sprite_movement:
 				lda VAR_SPRITE_DATA, x
 				sec
 				sbc #HEADER_PIXEL_OFFSET
-				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
 				and #%11110000
 				sta temp6
 
@@ -2352,6 +2364,7 @@ do_sprite_movement:
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
 				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+				and #%11110000
 				sta temp6
 
 				lda temp8 ; X Position doesn't change... just re-use it.
