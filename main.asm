@@ -70,6 +70,7 @@
 	flightTimer:				.res 1
 	playerDirection:			.res 1
 	lastPlayerDirection:		.res 1
+	playerVisibleDirection:		.res 1
 	famitoneScratch:			.res 3
 	currentDimension:			.res 1
 	currentPalette:				.res 1
@@ -1969,7 +1970,7 @@ do_player_movement:
 	adc #3 ; Add 3 to skip the "standing still" tile.
 
 	adc #PLAYER_SPRITE_ID
-	adc playerDirection
+	adc playerVisibleDirection
 	sta PLAYER_SPRITE+1
 	adc #1
 	sta PLAYER_SPRITE+5
@@ -3292,6 +3293,17 @@ handle_main_input:
 	sta lastPlayerDirection
 	store #0, playerVelocity
 
+	; No matter what, show the sprite facing the same direction you pressed.
+	lda ctrlButtons
+	and #CONTROLLER_LEFT
+	beq @not_left_vis
+		store #PLAYER_DIRECTION_LEFT, playerVisibleDirection
+	@not_left_vis:
+	lda ctrlButtons
+	and #CONTROLLER_RIGHT
+	beq @not_right_vis
+		store #PLAYER_DIRECTION_RIGHT, playerVisibleDirection
+	@not_right_vis:
 
 	lda playerXVelocityLockTime
 	cmp #0
