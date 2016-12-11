@@ -65,7 +65,8 @@
 	playerYVelocity:			.res 1
 	playerYVelocityNext:		.res 1
 	lastFramePlayerYVelocity:	.res 1
-	playerVelocityLockTime:		.res 1
+	playerXVelocityLockTime:	.res 1
+	playerYVelocityLockTime:	.res 1
 	flightTimer:				.res 1
 	playerDirection:			.res 1
 	lastPlayerDirection:		.res 1
@@ -123,6 +124,7 @@
 	PLAYER_JUMP_TIME_RUN		= $1c
 	PLAYER_JUMP_TIME			= $18
 	HOP_LOCK_TIME				= $6
+	RUN_MOVEMENT_LOCK_TIME		= $14
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
 	PLAYER_DIRECTION_MASK		= %00100000
@@ -471,6 +473,8 @@ load_level:
 	lda #0
 	sta playerPosition+1
 	sta tempPlayerPosition+1
+	sta playerXVelocityLockTime
+	sta playerYVelocityLockTime
 	lda #1
 	sta playerIsInScrollMargin
 	jsr seed_level_position_l
@@ -2915,7 +2919,7 @@ do_sprite_collision:
 			sta flightTimer
 
 			lda #HOP_LOCK_TIME
-			sta playerVelocityLockTime
+			sta playerYVelocityLockTime
 
 		
 		rts
@@ -3246,24 +3250,66 @@ update_total_gem_count:
 	rts
 
 	
+.macro do_x_velocity_lock DIRECTION, MAX_DIST, VEL_FAST, VEL_NORMAL
+	.local @we_are_ok, @skip_inc, @done_macro, @okay
+
+	lda ctrlButtons
+	and DIRECTION
+	beq @skip_inc
+
+		inc playerXVelocityLockTime
+		lda playerXVelocityLockTime
+		cmp MAX_DIST
+		bcc @we_are_ok
+			lda MAX_DIST
+			sta playerXVelocityLockTime
+		@we_are_ok:
+		lda VEL_FAST
+		jmp @done_macro
+	@skip_inc:
+		dec playerXVelocityLockTime
+		lda playerXVelocityLockTime
+		cmp #255
+		bne @okay
+			store #0, playerXVelocityLockTime
+		@okay: 
+		lda VEL_NORMAL
+
+	@done_macro:
+.endmacro
+
 handle_main_input: 
-	lda playerVelocityLockTime
+	lda playerYVelocityLockTime
 	cmp #0
 	beq @not_locked
-		dec playerVelocityLockTime
+		dec playerYVelocityLockTime
 		jsr read_controller
 		jmp @locked_allowed_buttons
 	@not_locked:
-	lda #0
-	sta playerVelocity
 	jsr read_controller
 
 	lda playerDirection
 	sta lastPlayerDirection
+	store #0, playerVelocity
+
+
+	lda playerXVelocityLockTime
+	cmp #0
+	beq @no_x_lock
+		; Okay, you're locked... so, if you're going in the same direction, cool. If not, well, actually, yes you are!
+		lda lastPlayerDirection
+		cmp #PLAYER_DIRECTION_LEFT
+		bne @not_left_lock
+			jmp @do_left
+		@not_left_lock:
+			jmp @do_right
+
+	@no_x_lock: 
 	
 	lda ctrlButtons
 	and #CONTROLLER_LEFT
 	beq @done_left
+	@do_left:
 		lda #PLAYER_DIRECTION_LEFT
 		sta playerDirection
 		
@@ -3273,33 +3319,50 @@ handle_main_input:
 		bne @continue_left
 		lda playerPosition
 		cmp #MIN_LEFT_LEVEL_POSITION
-		bcc @done_left
+		bcs @continue_left
+			; No Messing around, STOP.
+			lda #0
+			sta playerXVelocityLockTime
+			sta playerVelocity
+			jmp @done_left
 		@continue_left:
 		
 		lda ctrlButtons
 		and #CONTROLLER_B
 		bne @fast_left
-			lda #256-PLAYER_VELOCITY_NORMAL
+			; Slow left.
+			do_x_velocity_lock ctrlButtons, #0, #256-PLAYER_VELOCITY_NORMAL, #256-PLAYER_VELOCITY_NORMAL
 			jmp @doit_left
 		@fast_left: 
-			lda #256-PLAYER_VELOCITY_FAST
+			do_x_velocity_lock #CONTROLLER_LEFT, #RUN_MOVEMENT_LOCK_TIME, #256-PLAYER_VELOCITY_FAST, #256-PLAYER_VELOCITY_NORMAL
+			
 		@doit_left: 
 		sta playerVelocity
 	@done_left:
+
+	; Special case for if you're holding right, but locked to left. Don't pass go, don't collect $200
+	lda playerXVelocityLockTime
+	cmp #0
+	beq @your_good
+		lda playerDirection
+		cmp #PLAYER_DIRECTION_RIGHT
+		bne @done_right ; get outta here, ya sneak.
+	@your_good:
 	
 	lda ctrlButtons
 	and #CONTROLLER_RIGHT
 	beq @done_right
+	@do_right:
 		lda #PLAYER_DIRECTION_RIGHT
 		sta playerDirection
 		
 		lda ctrlButtons
 		and #CONTROLLER_B
 		bne @fast_right
-			lda #PLAYER_VELOCITY_NORMAL
+			do_x_velocity_lock ctrlButtons, #0, #PLAYER_VELOCITY_NORMAL, #PLAYER_VELOCITY_NORMAL
 			jmp @doit_right
 		@fast_right: 
-			lda #PLAYER_VELOCITY_FAST
+			do_x_velocity_lock #CONTROLLER_RIGHT, #RUN_MOVEMENT_LOCK_TIME, #PLAYER_VELOCITY_FAST, #PLAYER_VELOCITY_NORMAL
 		@doit_right: 
 		sta playerVelocity
 	@done_right:
