@@ -93,6 +93,7 @@
 	currentBank:				.res 1
 	arbitraryTileUpdateId:		.res 1
 	arbitraryTileUpdatePos:		.res 1
+	isOnIce:					.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -126,6 +127,7 @@
 	PLAYER_JUMP_TIME			= $18
 	HOP_LOCK_TIME				= $6
 	RUN_MOVEMENT_LOCK_TIME		= $0a
+	ICE_RUN_MOVEMENT_LOCK_TIME	= $1a
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
 	PLAYER_DIRECTION_MASK		= %00100000
@@ -1509,8 +1511,11 @@ do_collision_test:
 
 	@ice_age:
 		; Pretty much everything is a collision! Ice is a PITA...
-		lda #TILE_FLOWER
+		lda tempCollision
+		cmp #TILE_FLOWER
 		beq @no_collision
+		cmp #TILE_WATER
+		beq @collision_ice
 		jmp @collision
 
 	@calm:
@@ -1540,6 +1545,11 @@ do_collision_test:
 
 	@no_collision:
 		lda #0
+		rts
+
+	@collision_ice:
+		lda #1
+		sta isOnIce
 		rts
 
 
@@ -3356,8 +3366,17 @@ handle_main_input:
 			; Slow left.
 			do_x_velocity_lock ctrlButtons, #0, #256-PLAYER_VELOCITY_NORMAL, #256-PLAYER_VELOCITY_NORMAL
 			jmp @doit_left
-		@fast_left: 
-			do_x_velocity_lock #CONTROLLER_LEFT, #RUN_MOVEMENT_LOCK_TIME, #256-PLAYER_VELOCITY_FAST, #256-PLAYER_VELOCITY_NORMAL
+		@fast_left:
+			lda isOnIce
+			cmp #1
+			beq @icy2
+				lda #RUN_MOVEMENT_LOCK_TIME
+				jmp @go_velocitize2
+			@icy2:
+				lda #ICE_RUN_MOVEMENT_LOCK_TIME
+			@go_velocitize2:
+			sta tempa
+			do_x_velocity_lock #CONTROLLER_LEFT, tempa, #256-PLAYER_VELOCITY_FAST, #256-PLAYER_VELOCITY_NORMAL
 			
 		@doit_left: 
 		sta playerVelocity
@@ -3375,7 +3394,8 @@ handle_main_input:
 	
 	lda ctrlButtons
 	and #CONTROLLER_RIGHT
-	beq @done_right
+	bne @do_right
+		jmp @done_right
 	@do_right:
 		lda #PLAYER_DIRECTION_RIGHT
 		sta playerDirection
@@ -3386,7 +3406,16 @@ handle_main_input:
 			do_x_velocity_lock ctrlButtons, #0, #PLAYER_VELOCITY_NORMAL, #PLAYER_VELOCITY_NORMAL
 			jmp @doit_right
 		@fast_right: 
-			do_x_velocity_lock #CONTROLLER_RIGHT, #RUN_MOVEMENT_LOCK_TIME, #PLAYER_VELOCITY_FAST, #PLAYER_VELOCITY_NORMAL
+			lda isOnIce
+			cmp #1
+			beq @icy
+				lda #RUN_MOVEMENT_LOCK_TIME
+				jmp @go_velocitize
+			@icy:
+				lda #ICE_RUN_MOVEMENT_LOCK_TIME
+			@go_velocitize:
+			sta tempa
+			do_x_velocity_lock #CONTROLLER_RIGHT, tempa, #PLAYER_VELOCITY_FAST, #PLAYER_VELOCITY_NORMAL
 		@doit_right: 
 		sta playerVelocity
 	@done_right:
@@ -3915,6 +3944,7 @@ main_loop:
 	jsr handle_main_input
 	lda #0
 	sta isInWarpZone
+	sta isOnIce
 	sta warpDimensionA
 	sta warpDimensionB
 	jsr reset_collision_state
