@@ -125,7 +125,7 @@
 	PLAYER_JUMP_TIME_RUN		= $1c
 	PLAYER_JUMP_TIME			= $18
 	HOP_LOCK_TIME				= $6
-	RUN_MOVEMENT_LOCK_TIME		= $14
+	RUN_MOVEMENT_LOCK_TIME		= $0a
 	PLAYER_DIRECTION_LEFT		= $20
 	PLAYER_DIRECTION_RIGHT		= $0
 	PLAYER_DIRECTION_MASK		= %00100000
@@ -3252,7 +3252,7 @@ update_total_gem_count:
 
 	
 .macro do_x_velocity_lock DIRECTION, MAX_DIST, VEL_FAST, VEL_NORMAL
-	.local @we_are_ok, @skip_inc, @done_macro, @okay
+	.local @we_are_ok, @skip_inc, @done_macro, @okay, @normal
 
 	lda ctrlButtons
 	and DIRECTION
@@ -3274,6 +3274,16 @@ update_total_gem_count:
 		bne @okay
 			store #0, playerXVelocityLockTime
 		@okay: 
+		lda ctrlButtons
+		and #(CONTROLLER_LEFT + CONTROLLER_RIGHT)
+		cmp #0
+		beq @normal
+		cmp #CONTROLLER_B
+		bne @normal
+			; Gotta go fast!
+			lda VEL_FAST
+			jmp @done_macro
+		@normal: 
 		lda VEL_NORMAL
 
 	@done_macro:
@@ -3320,7 +3330,8 @@ handle_main_input:
 	
 	lda ctrlButtons
 	and #CONTROLLER_LEFT
-	beq @done_left
+	bne @do_left
+		jmp @done_left
 	@do_left:
 		lda #PLAYER_DIRECTION_LEFT
 		sta playerDirection
@@ -3358,7 +3369,8 @@ handle_main_input:
 	beq @your_good
 		lda playerDirection
 		cmp #PLAYER_DIRECTION_RIGHT
-		bne @done_right ; get outta here, ya sneak.
+		beq @your_good
+		jmp @done_right ; get outta here, ya sneak.
 	@your_good:
 	
 	lda ctrlButtons
