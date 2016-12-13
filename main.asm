@@ -1510,12 +1510,27 @@ do_collision_test:
 		beq @no_collision
 		jmp @collision
 
+	; Yes, it's kind of weird to throw this in here. That said, we drop a few instructions by doing it, since everything
+	; Both below and above can access it. (And the rest of the code looks cleaner.) In short, deal with it.
+	@collision:
+		lda #1
+		rts
+
+	@no_collision:
+		lda #0
+		rts
+
+
 	@ice_age:
 		; Pretty much everything is a collision! Ice is a PITA...
 		lda tempCollision
 		cmp #TILE_FLOWER
 		beq @no_collision
 		cmp #TILE_WATER
+		beq @collision_ice
+		cmp #TILE_ICE_BLOCK
+		beq @collision_ice
+		cmp #TILE_PLANT
 		beq @collision_ice
 		jmp @collision
 
@@ -1541,14 +1556,6 @@ do_collision_test:
 		lda #0
 		rts
 
-
-	@collision: ; intentional fallthru.
-		lda #1
-		rts
-
-	@no_collision:
-		lda #0
-		rts
 
 	@collision_ice:
 		lda #1
@@ -3481,6 +3488,15 @@ handle_main_input:
 		lda lastCtrlButtons
 		and #CONTROLLER_START
 		bne @done_start
+		.if DEBUGGING = 1
+			lda ctrlButtons
+			and #CONTROLLER_SELECT
+			beq @no_hax
+				; If you hit both start and select in debug mode, you finish the level!
+				jsr do_next_level
+				jmp show_ready
+			@no_hax:
+		.endif
 		jsr do_pause_screen
 	@done_start:
 
