@@ -151,7 +151,7 @@
 
 	DIMENSION_MASK				= %11100000
 	DIMENSION_PLAIN				= %00000000
-	DIMENSION_CALM				= %01000000
+	DIMENSION_BARREN			= %00000010
 	DIMENSION_ICE_AGE			= %11000000
 	DIMENSION_AGGRESSIVE		= %00100000
 	DIMENSION_AUTUMN			= %01100000
@@ -159,9 +159,9 @@
 	DIMENSION_FADE				= %11100000
 	DIMENSION_INVALID			= %00011111
 
-	TILE_ROW_PLAIN				= 6
-	TILE_ROW_CALM				= 6
-	TILE_ROW_ICE_AGE			= 8
+	TILE_ROW_PLAIN				= $6
+	TILE_ROW_BARREN				= $a
+	TILE_ROW_ICE_AGE			= $8
 	TILE_ROW_AGGRESSIVE			= $a
 	TILE_ROW_AUTUMN				= $a
 	TILE_ROW_END_OF_DAYS		= $a
@@ -235,6 +235,7 @@
 ; Music
 	SONG_CRAPPY 		= 5
 	SONG_ICE_CRAPPY 	= 1
+	SONG_CRAPPY_DESERT	= 4
 	SONG_DEATH			= 3
 
 ;;;;;;;;;;;;;;;;;;;;;;;
@@ -1472,15 +1473,15 @@ do_collision_test:
 	bcs @collision
 
 	lda currentDimension
-	cmp #DIMENSION_CALM
-	beq @calm
+	cmp #DIMENSION_BARREN
+	beq @barren
 	cmp #DIMENSION_AGGRESSIVE
 	beq @fire
 	cmp #DIMENSION_AUTUMN
 	beq @fire
 	cmp #DIMENSION_ICE_AGE
 	beq @ice_age
-	; By default, fallthrough to @default. Hits calm and normal. (And I guess end of days)
+	; By default, fallthrough to @default. Hits barren and normal. (And I guess end of days)
 
 
 	@default: 
@@ -1518,9 +1519,11 @@ do_collision_test:
 		beq @collision_ice
 		jmp @collision
 
-	@calm:
+	@barren:
 		lda tempCollision
 		cmp #TILE_CLOUD
+		beq @no_collision
+		cmp #TILE_PLANT
 		beq @no_collision
 		jmp @default ;
 
@@ -3550,8 +3553,8 @@ seed_palette:
 	beq @ice
 	cmp #DIMENSION_END_OF_DAYS
 	beq @eod
-	cmp #DIMENSION_CALM
-	beq @calm
+	cmp #DIMENSION_BARREN
+	beq @barren
 
 	@default: 
 		store #0, currentPalette
@@ -3565,7 +3568,7 @@ seed_palette:
 		store #3, currentPalette
 		rts
 
-	@calm: 
+	@barren: 
 		store #4, currentPalette
 		rts
 
@@ -3673,6 +3676,12 @@ play_music_for_dimension:
 		jsr music_play
 		rts
 	@not_ice_age:
+	cmp #DIMENSION_BARREN
+	bne @not_barren
+		lda #SONG_CRAPPY_DESERT
+		jsr music_play
+		rts
+	@not_barren:
 	; Fall back to default track for consistency's sake.
 	lda #SONG_CRAPPY
 	jsr music_play
@@ -3728,8 +3737,8 @@ do_fade_anim:
 get_row_from_a:
 	cmp #DIMENSION_PLAIN
 	beq @plain
-	cmp #DIMENSION_CALM
-	beq @plain
+	cmp #DIMENSION_BARREN
+	beq @aggressive
 	cmp #DIMENSION_ICE_AGE
 	beq @ice_age
 	; Fallthru... just use a default to save some instructions.
@@ -4426,21 +4435,21 @@ menu_chr_data:
 	
 default_palettes: 
 	; Normal
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$16,$29,$1a,$31,$3d,$00,$30
+	.incbin "graphics/default.pal"
 	; fire-ized
 fire_palettes:
-	.byte $31,$06,$17,$0a,$31,$06,$17,$2D,$31,$16,$19,$0a,$31,$3d,$00,$30
+	.incbin "graphics/fire.pal"
 ice_palettes:
-	.byte $31,$1c,$21,$1c,$31,$11,$21,$1c,$31,$06,$30,$31,$31,$3d,$00,$30
+	.incbin "graphics/ice.pal"
 dark_palettes:
-	.byte $00,$0f,$07,$0f,$00,$0f,$0c,$0f,$00,$06,$0b,$0f,$00,$3d,$00,$3d
-calm_palettes:
-	.byte $31,$06,$16,$1a,$31,$11,$21,$06,$31,$16,$29,$1a,$31,$3d,$00,$31
+	.incbin "graphics/dark.pal"
+desert_palettes:
+	.incbin "graphics/desert.pal"
 
 
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
-	.byte $31,$27,$38,$0f,$31,$06,$16,$1a,$31,$01,$21,$31,$31,$09,$19,$29
+	.incbin "graphics/default_sprite.pal"
 
 menu_palettes: 
 	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29

@@ -1,4 +1,4 @@
-.define  		BUILD 			3694  
+.define  		BUILD 			3703  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Sun 12/11/2016 18:41" 
-.define 		SPLASH_MESSAGE 	"Multiple endings!               ... right? " 
+.define 		BUILD_DATE		"Mon 12/12/2016 19:08" 
+.define 		SPLASH_MESSAGE 	"Only 30 years late to the       party " 
