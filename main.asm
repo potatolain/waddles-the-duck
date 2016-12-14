@@ -27,73 +27,74 @@
 
 		
 .segment "ZEROPAGE"
-	watchme: 					.res 1
+	watchme: 						.res 1
 	; Set of "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
-	temp0: 						.res 1
-	temp1: 						.res 1
-	temp2:						.res 1
-	temp3: 						.res 1
-	temp4: 						.res 1
-	temp5:						.res 1
-	temp6:						.res 1
-	temp7:						.res 1
-	temp8:						.res 1
-	temp9:						.res 1
-	tempa:						.res 1
-	tempb:						.res 1
-	tempCollision:				.res 1 ; Yes, this is lame.
-	playerPosition:				.res 2
-	playerScreenPosition:		.res 1
-	tempPlayerPosition:			.res 2
-	tempPlayerScreenPosition:	.res 1
-	levelPosition:				.res 1
-	playerIsInScrollMargin:		.res 1
-	levelMemPosR:				.res 1
-	frameCounter: 				.res 1
-	ppuCtrlBuffer:				.res 1
-	ppuMaskBuffer: 				.res 1
-	tempAddr: 					.res 2
-	levelAddr: 					.res 2
-	nametableAddr:				.res 2
-	scrollX:					.res 1
-	scrollY:					.res 1
-	ctrlButtons:				.res 1
-	lastCtrlButtons:			.res 1
-	playerVelocity:				.res 1
-	playerYVelocity:			.res 1
-	playerYVelocityNext:		.res 1
-	lastFramePlayerYVelocity:	.res 1
-	playerXVelocityLockTime:	.res 1
-	playerYVelocityLockTime:	.res 1
-	flightTimer:				.res 1
-	playerDirection:			.res 1
-	lastPlayerDirection:		.res 1
-	playerVisibleDirection:		.res 1
-	famitoneScratch:			.res 3
-	currentDimension:			.res 1
-	currentPalette:				.res 1
-	warpDimensionA:				.res 1
-	warpDimensionB:				.res 1
-	isInWarpZone:				.res 1
-	tempCollisionTile:			.res 1
-	tempCollisionTilePos:		.res 1
-	currentLevel:				.res 1
-	lvlRowDataAddr:				.res 2
-	lvlDataAddr:				.res 2
-	lvlSpriteDataAddr:			.res 2
-	paletteAddr:				.res 2
-	currentSprite:				.res 1
-	xScrollChange:				.res 1
-	duckPausePosition:			.res 1
-	macroTmp:					.res 2
-	gemCount:					.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
-	totalGemCount:				.res 1 ; So does this.
-	currentBank:				.res 1
-	arbitraryTileUpdateId:		.res 1
-	arbitraryTileUpdatePos:		.res 1
-	isOnIce:					.res 1
+	temp0: 							.res 1
+	temp1: 							.res 1
+	temp2:							.res 1
+	temp3: 							.res 1
+	temp4: 							.res 1
+	temp5:							.res 1
+	temp6:							.res 1
+	temp7:							.res 1
+	temp8:							.res 1
+	temp9:							.res 1
+	tempa:							.res 1
+	tempb:							.res 1
+	tempCollision:					.res 1 ; Yes, this is lame.
+	playerPosition:					.res 2
+	playerScreenPosition:			.res 1
+	tempPlayerPosition:				.res 2
+	tempPlayerScreenPosition:		.res 1
+	levelPosition:					.res 1
+	playerIsInScrollMargin:			.res 1
+	levelMemPosR:					.res 1
+	frameCounter: 					.res 1
+	ppuCtrlBuffer:					.res 1
+	ppuMaskBuffer: 					.res 1
+	tempAddr: 						.res 2
+	levelAddr: 						.res 2
+	nametableAddr:					.res 2
+	scrollX:						.res 1
+	scrollY:						.res 1
+	ctrlButtons:					.res 1
+	lastCtrlButtons:				.res 1
+	playerVelocity:					.res 1
+	playerYVelocity:				.res 1
+	playerYVelocityNext:			.res 1
+	lastFramePlayerYVelocity:		.res 1
+	playerXVelocityLockTime:		.res 1
+	playerYVelocityLockTime:		.res 1
+	flightTimer:					.res 1
+	playerDirection:				.res 1
+	lastPlayerDirection:			.res 1
+	playerVisibleDirection:			.res 1
+	famitoneScratch:				.res 3
+	currentDimension:				.res 1
+	currentPalette:					.res 1
+	warpDimensionA:					.res 1
+	warpDimensionB:					.res 1
+	isInWarpZone:					.res 1
+	tempCollisionTile:				.res 1
+	tempCollisionTilePos:			.res 1
+	currentLevel:					.res 1
+	lvlRowDataAddr:					.res 2
+	lvlDataAddr:					.res 2
+	lvlSpriteDataAddr:				.res 2
+	paletteAddr:					.res 2
+	currentSprite:					.res 1
+	xScrollChange:					.res 1
+	duckPausePosition:				.res 1
+	macroTmp:						.res 2
+	gemCount:						.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
+	totalGemCount:					.res 1 ; So does this.
+	currentBank:					.res 1
+	arbitraryTileUpdateId:			.res 1
+	arbitraryTileUpdatePos:			.res 1
+	arbitraryTileNametableOffset:	.res 1
+	isOnIce:						.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
@@ -1425,6 +1426,13 @@ do_special_tile_stuff:
 
 			store tempCollisionTilePos,	 arbitraryTileUpdatePos
 			store #TILE_QUESTION_BLOCK+1, arbitraryTileUpdateId
+			store #0, arbitraryTileNametableOffset
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, y
+			and #%00000001
+			cmp #0
+			beq @do_nothing
+				store #4, arbitraryTileNametableOffset
+			@do_nothing:
 
 			phx
 			ldx #FT_SFX_CH0
@@ -4108,17 +4116,8 @@ update_arbitrary_tile:
 		lda tempAddr+1
 		clc
 		adc #$20 ; We want an offset on $20 for our nametable. (Or 24... but we'll get there; give it a moment)
+		adc arbitraryTileNametableOffset
 		sta tempAddr+1
-
-		lda ppuCtrlBuffer
-		and #%00000001
-		cmp #0
-		beq @dont_add_4
-			lda tempAddr+1
-			clc
-			adc #4
-			sta tempAddr+1
-		@dont_add_4:
 
 		lda PPU_STATUS
 		store tempAddr+1, PPU_ADDR
