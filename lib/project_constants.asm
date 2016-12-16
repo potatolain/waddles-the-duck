@@ -1,4 +1,4 @@
-.define  		BUILD 			3729  
+.define  		BUILD 			3732  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Thu 12/15/2016 19:32" 
-.define 		SPLASH_MESSAGE 	"Honking Mongeese " 
+.define 		BUILD_DATE		"Fri 12/16/2016 13:12" 
+.define 		SPLASH_MESSAGE 	"Pants not included. " 

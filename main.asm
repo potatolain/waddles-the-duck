@@ -1827,6 +1827,8 @@ do_player_vertical_movement:
 		lda PLAYER_SPRITE
 		clc
 		adc playerYVelocity
+		cmp #$fd
+		bcs @dont_do_it_at_all
 		cmp #SPRITE_OFFSCREEN
 		bcc @not_uhoh
 			jsr do_player_death
@@ -1841,6 +1843,7 @@ do_player_vertical_movement:
 		sta PLAYER_SPRITE+12
 		sta PLAYER_SPRITE+16
 		sta PLAYER_SPRITE+20
+		@dont_do_it_at_all:
 		
 	rts
 	
