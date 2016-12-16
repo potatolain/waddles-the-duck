@@ -94,6 +94,7 @@
 	arbitraryTileUpdateId:			.res 1
 	arbitraryTileUpdatePos:			.res 1
 	arbitraryTileNametableOffset:	.res 1
+	arbitraryTileAddr:				.res 2
 	isOnIce:						.res 1
 
 	CHAR_TABLE_START 			= $e0
@@ -1433,6 +1434,7 @@ do_special_tile_stuff:
 			beq @do_nothing
 				store #4, arbitraryTileNametableOffset
 			@do_nothing:
+			jsr precalculate_arbitrary_tile
 
 			phx
 			ldx #FT_SFX_CH0
@@ -1451,6 +1453,43 @@ do_special_tile_stuff:
 
 reset_collision_state:
 	store #0, tempCollisionTile
+	rts
+
+precalculate_arbitrary_tile:
+	; Get the real id for it...
+	lda arbitraryTileUpdateId
+	asl
+	sta arbitraryTileUpdateId
+
+	lda #0
+	sta arbitraryTileAddr+1
+
+	lda arbitraryTileUpdatePos
+	and #%11110000
+	asl
+	rol arbitraryTileAddr+1
+	asl
+	rol arbitraryTileAddr+1
+	clc
+	adc #BOTTOM_HUD_TILE
+	sta arbitraryTileAddr
+	lda arbitraryTileAddr+1
+	adc #0
+	sta arbitraryTileAddr+1 ; Deal with carry
+	
+	lda arbitraryTileUpdatePos
+	and #%00001111
+	asl
+	ora arbitraryTileAddr
+	sta arbitraryTileAddr
+	
+	lda arbitraryTileAddr+1
+	clc
+	adc #$20 ; We want an offset on $20 for our nametable. (Or 24... but we'll get there; give it a moment)
+	adc arbitraryTileNametableOffset
+	sta arbitraryTileAddr+1
+
+
 	rts
 
 ; Expectations: 
@@ -4081,47 +4120,13 @@ update_buffer_for_warp_zone:
 		rts
 
 update_arbitrary_tile:
-	; This is painfully inefficient for a method run during vblank... could easily pre-compute this during not-vblank if needed.
 	lda arbitraryTileUpdatePos
 	cmp #0
 	beq @no_update
 
-		; Get the real id for it...
-		lda arbitraryTileUpdateId
-		asl
-		sta arbitraryTileUpdateId
-
-		lda #0
-		sta tempAddr+1
-
-		lda arbitraryTileUpdatePos
-		and #%11110000
-		asl
-		rol tempAddr+1
-		asl
-		rol tempAddr+1
-		clc
-		adc #BOTTOM_HUD_TILE
-		sta tempAddr
-		lda tempAddr+1
-		adc #0
-		sta tempAddr+1 ; Deal with carry
-		
-		lda arbitraryTileUpdatePos
-		and #%00001111
-		asl
-		ora tempAddr
-		sta tempAddr
-		
-		lda tempAddr+1
-		clc
-		adc #$20 ; We want an offset on $20 for our nametable. (Or 24... but we'll get there; give it a moment)
-		adc arbitraryTileNametableOffset
-		sta tempAddr+1
-
 		lda PPU_STATUS
-		store tempAddr+1, PPU_ADDR
-		store tempAddr, PPU_ADDR
+		store arbitraryTileAddr+1, PPU_ADDR
+		store arbitraryTileAddr, PPU_ADDR
 		lda arbitraryTileUpdateId
 		sta PPU_DATA
 		clc
@@ -4130,15 +4135,15 @@ update_arbitrary_tile:
 
 		; Now jump two lines and do it again.
 		lda PPU_STATUS
-		lda tempAddr
+		lda arbitraryTileAddr
 		clc
 		adc #$20
-		sta tempAddr
-		lda tempAddr+1
+		sta arbitraryTileAddr
+		lda arbitraryTileAddr+1
 		adc #0
-		sta tempAddr+1
+		sta arbitraryTileAddr+1
 		sta PPU_ADDR
-		store tempAddr, PPU_ADDR
+		store arbitraryTileAddr, PPU_ADDR
 
 		lda arbitraryTileUpdateId
 		clc
