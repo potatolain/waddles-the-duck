@@ -80,6 +80,7 @@
 	tempCollisionTile:				.res 1
 	tempCollisionTilePos:			.res 1
 	currentLevel:					.res 1
+	currentLevelFlagX:				.res 1
 	lvlRowDataAddr:					.res 2
 	lvlDataAddr:					.res 2
 	lvlSpriteDataAddr:				.res 2
@@ -202,7 +203,7 @@
 	TILE_QUESTION_BLOCK		= 2
 	TILE_CLOUD				= 28
 
-	TILE_LEVEL_END			= 51
+	TILE_LEVEL_END			= 49
 
 	GAME_TILE_A				= $e6
 	GAME_TILE_0				= $dc
@@ -212,6 +213,7 @@
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
+	END_OF_LEVEL_WAIT_TIME	= 192
 
 	; How many frames the player goes up before going down if dying to an enemy.
 	DEATH_HOP_TIME			= 6
@@ -239,6 +241,7 @@
 	SONG_ICE_CRAPPY 	= 1
 	SONG_CRAPPY_DESERT	= 4
 	SONG_DEATH			= 3
+	SONG_LEVEL_END		= 9
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -528,6 +531,10 @@ load_level:
 	lda (tempAddr), y
 	sta currentDimension
 	jsr seed_palette
+
+	iny
+	lda (tempAddr), y
+	sta currentLevelFlagX
 
 	ldy #4
 	lda (tempAddr), y
@@ -1397,15 +1404,6 @@ determine_if_question_block_taken:
 
 do_special_tile_stuff:
 	lda tempCollisionTile
-	cmp #TILE_LEVEL_END
-	bne @not_eol
-		; Technically, we're going all abandon ship on our stack here.
-		; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
-		ldx #$ff
-		txs
-		jsr do_next_level
-		jmp show_ready
-	@not_eol:
 	cmp #TILE_QUESTION_BLOCK
 	beq @skip_question_block_slingshot
 		jmp @not_question_block
@@ -1512,7 +1510,9 @@ do_collision_test:
 	sta tempCollision
 
 	cmp #TILE_LEVEL_END
-	beq @special_tile_collision
+	beq @no_collision
+	cmp #TILE_LEVEL_END+1
+	beq @no_collision
 	cmp #TILE_QUESTION_BLOCK
 	beq @special_tile_collision
 
@@ -1925,10 +1925,29 @@ do_player_movement:
 		clc
 		adc temp4
 		sta temp2
+		sta tempb
 		lda tempPlayerPosition+1
 		adc #0
 		sta temp1
+		sta tempa
 		jsr test_horizontal_collision
+
+		; See if we're at the flag point.
+		.repeat 4
+			lsr tempa
+			ror tempb
+		.endrepeat
+		lda tempb
+		cmp currentLevelFlagX
+		bcc @not_end_level
+			; Technically, we're going all abandon ship on our stack here.
+			; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
+			jsr do_end_of_level_anim
+			ldx #$ff
+			txs
+			jsr do_next_level
+			jmp show_ready
+		@not_end_level:
 
 		store #1, temp3
 		lda tempPlayerPosition 
@@ -2025,46 +2044,7 @@ do_player_movement:
 		
 	@continue:
 	
-	lda playerVelocity
-	cmp #PLAYER_VELOCITY_FAST
-	bne @slow
-	cmp #256-PLAYER_VELOCITY_FAST
-	bne @slow
-
-		lda frameCounter
-		and #%000001000
-		lsr 
-		lsr
-		lsr
-		jmp @do_anim
-	@slow: 
-		lda frameCounter
-		and #%00000100
-		lsr
-		lsr
-
-	@do_anim:
-	sta temp0
-	clc
-	; multiply by 3.
-	adc temp0
-	adc temp0
-	adc #3 ; Add 3 to skip the "standing still" tile.
-
-	adc #PLAYER_SPRITE_ID
-	adc playerVisibleDirection
-	sta PLAYER_SPRITE+1
-	adc #1
-	sta PLAYER_SPRITE+5
-	adc #1
-	sta PLAYER_SPRITE+9
-	adc #$0e ; 10 - the three sprites set here.
-	sta PLAYER_SPRITE+13
-	adc #1
-	sta PLAYER_SPRITE+17
-	adc #1
-	sta PLAYER_SPRITE+21
-
+	jsr do_player_anim
 	lda playerDirection
 	cmp #PLAYER_DIRECTION_LEFT
 	bne @not_left
@@ -2150,6 +2130,49 @@ do_player_movement:
 		sta PLAYER_SPRITE+23
 	@dont_scroll: 
 	
+
+	rts
+
+do_player_anim:
+	lda playerVelocity
+	cmp #PLAYER_VELOCITY_FAST
+	bne @slow
+	cmp #256-PLAYER_VELOCITY_FAST
+	bne @slow
+
+		lda frameCounter
+		and #%000001000
+		lsr 
+		lsr
+		lsr
+		jmp @do_anim
+	@slow: 
+		lda frameCounter
+		and #%00000100
+		lsr
+		lsr
+
+	@do_anim:
+	sta temp0
+	clc
+	; multiply by 3.
+	adc temp0
+	adc temp0
+	adc #3 ; Add 3 to skip the "standing still" tile.
+
+	adc #PLAYER_SPRITE_ID
+	adc playerVisibleDirection
+	sta PLAYER_SPRITE+1
+	adc #1
+	sta PLAYER_SPRITE+5
+	adc #1
+	sta PLAYER_SPRITE+9
+	adc #$0e ; 10 - the three sprites set here.
+	sta PLAYER_SPRITE+13
+	adc #1
+	sta PLAYER_SPRITE+17
+	adc #1
+	sta PLAYER_SPRITE+21
 
 	rts
 
@@ -4355,6 +4378,68 @@ do_next_level:
 	bne @just_go
 		jsr game_end
 	@just_go:
+	rts
+
+do_end_of_level_anim:
+	lda #SONG_LEVEL_END
+	jsr music_play
+	lda #PLAYER_VELOCITY_FALLING
+	sta playerYVelocity
+	lda #PLAYER_VELOCITY_NORMAL
+	sta playerVelocity
+
+	ldx #0
+
+	@loop:
+		phx
+		lda PLAYER_SPRITE
+		cmp #SPRITE_OFFSCREEN ; If you get yanked offscreen you'll probably get killed... let's avoid that.
+		beq @no_gravity
+			jsr do_player_vertical_movement
+		@no_gravity: 
+		lda PLAYER_SPRITE+3
+		clc
+		adc #1
+		bcc @dont_hide_1 ; Flipped over the other side? Time to continue on...
+			ldy #SPRITE_OFFSCREEN
+			sty PLAYER_SPRITE
+			sty PLAYER_SPRITE+12
+		@dont_hide_1:
+		sta PLAYER_SPRITE+3
+		sta PLAYER_SPRITE+15
+		clc
+		adc #8
+		bcc @dont_hide_2
+			ldy #SPRITE_OFFSCREEN
+			sty PLAYER_SPRITE+4
+			sty PLAYER_SPRITE+16
+		@dont_hide_2:
+		sta PLAYER_SPRITE+7
+		sta PLAYER_SPRITE+19
+		clc
+		adc #8
+		bcc @dont_hide_3
+			ldy #SPRITE_OFFSCREEN
+			sty PLAYER_SPRITE+8
+			sty PLAYER_SPRITE+20
+		@dont_hide_3:
+		sta PLAYER_SPRITE+11
+		sta PLAYER_SPRITE+23
+
+		jsr sound_update
+		jsr vblank_wait
+		jsr do_sprite0
+		jsr do_player_anim
+		; Do it twice, animating every other tile, to make timing code simpler.
+		jsr sound_update
+		jsr vblank_wait
+		jsr do_sprite0
+
+		plx
+		inx
+		cpx #END_OF_LEVEL_WAIT_TIME
+		bne @loop
+
 	rts
 	
 disable_all:
