@@ -1226,12 +1226,11 @@ draw_current_nametable_row:
 
 
 	ldx #0
-	@looper: 
+	.repeat 24 ; Use an unrolled loop to do things a bit faster, at a cost of rom space.
 		lda NEXT_ROW_CACHE, x
 		sta PPU_DATA
 		inx
-		cpx #24 ; 32 - 8 rows for sprite 0 header stuff
-		bne @looper
+	.endrepeat
 		
 	lda PPU_STATUS
 	lda nametableAddr
@@ -1246,12 +1245,11 @@ draw_current_nametable_row:
 	sta PPU_ADDR
 	
 	ldx #32
-	@looper2: 
+	.repeat 24 ; ditto
 		lda NEXT_ROW_CACHE, x
 		sta PPU_DATA
 		inx
-		cpx #56 ; 64 - 8 rows for sprite 0 header stuff
-		bne @looper2
+	.endrepeat
 
 	lda levelPosition
 	and #%00000001
@@ -1306,8 +1304,22 @@ draw_current_nametable_row:
 			inx
 		.endrepeat
 		; Write one last time w/o the memory stuffs.
-		lda NEXT_ROW_ATTRS, x
-		sta PPU_DATA
+		lda PPU_DATA ; dummy read to get the right value, caching, etc...
+		lda temp1
+		eor #$ff ; flip all bits
+		and PPU_DATA ; Grab data and immediately strip out the new bits. 
+		sta temp2
+		lda NEXT_ROW_ATTRS, x ; combine with values...
+		and temp1
+		ora temp2 ; mischief managed.
+		sta temp2
+
+		lda tempAddr+1
+		sta PPU_ADDR
+		lda tempAddr
+		sta PPU_ADDR
+		lda temp2
+		sta PPU_DATA	
 	@done_attrs: 
 		
 	reset_ppu_scrolling
@@ -2222,6 +2234,7 @@ do_sprite_movement:
 				lda temp8
 				sec
 				sbc levelPosition
+				; TODO: This logic isn't quite right... ends up killing off perfectly lively sprites
 				bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
 				cmp #16
 				bcs @go_away_forever
