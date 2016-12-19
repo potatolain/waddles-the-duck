@@ -971,7 +971,7 @@ music_music_data:
 
 
 @song9ch0:
-	.byte $fb,$0b
+	.byte $fb,$08
 @song9ch0loop:
 @ref305:
 	.byte $86,$1a,$1a,$22,$28,$41,$3b,$1e,$1e,$26,$2c,$45,$3f,$22,$22,$2a

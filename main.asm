@@ -214,7 +214,7 @@
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
-	END_OF_LEVEL_WAIT_TIME	= 192
+	END_OF_LEVEL_WAIT_TIME	= 128
 
 	; How many frames the player goes up before going down if dying to an enemy.
 	DEATH_HOP_TIME			= 6
@@ -4397,7 +4397,7 @@ do_end_of_level_anim:
 	jsr music_play
 	lda #PLAYER_VELOCITY_FALLING
 	sta playerYVelocity
-	lda #PLAYER_VELOCITY_NORMAL
+	lda #PLAYER_VELOCITY_NORMAL*2
 	sta playerVelocity
 
 	ldx #0
