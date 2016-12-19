@@ -216,7 +216,7 @@
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
-	END_OF_LEVEL_WAIT_TIME	= 128
+	END_OF_LEVEL_WAIT_TIME	= 144
 
 	; How many frames the player goes up before going down if dying to an enemy.
 	DEATH_HOP_TIME			= 6
@@ -2254,10 +2254,9 @@ do_sprite_movement:
 				lda temp8
 				sec
 				sbc levelPosition
-				bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
 				cmp #0
 				beq @go_away_forever
-				cmp #16
+				cmp #18
 				bcs @go_away_forever
 				jmp @after_remove
 			@remove_left:
