@@ -28,6 +28,7 @@
 		
 .segment "ZEROPAGE"
 	watchme: 						.res 1
+	skippedSprites:					.res 1 ; Counter for every time we have a sprite and can't fit it into memory. If this is non-zero, there's a potential problem with the engine and/or level layout.
 	; Set of "scratch" variables for whatever we may be doing at the time. 
 	; A little hard to track honestly, but the NES has very limited ram. 
 	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
@@ -511,10 +512,6 @@ load_level:
 	sta warpDimensionA
 	sta warpDimensionB
 
-	lda #0
-	sta currentSprite
-
-
 	; Large amount of weird stuff going on here...
 	; First, grab our level id, then look up the address of the various data for the level... 
 	lda currentLevel
@@ -794,6 +791,7 @@ load_current_line:
 			jmp @move_on
 		@dont_move_on:
 			store #0, temp1 ; Position of the byte
+			store #255, currentSprite
 			txa
 			pha 
 			lda #%00000001
@@ -841,11 +839,11 @@ load_current_line:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
 				sta macroTmp ; TODO: This is... bad form. Plain and simple. Need it to compare y, below.
 				cmp #0
-				beq @not_covered ; Kind of a hack... your first sprite may get dupes, but this way we don't have to throw a bogus value in to start.
+				beq @not_covered_and_empty ; Kind of a hack... your first sprite may get dupes, but this way we don't have to throw a bogus value in to start.
 				cpy macroTmp
 				bne @not_covered
 					; Okay, if you were a gem we have a little more work for you...
-					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
 					cmp #SPRITE_TYPE_COLLECTIBLE
 					bne @not_gem
 						jsr remove_existing_gems_and_boxes
@@ -854,6 +852,14 @@ load_current_line:
 					plx
 					; Escape. Escape.
 					jmp @move_on_plx
+				@not_covered_and_empty:
+					; Before we do the not covered stuff, here's a good spot for a new sprite. Well, maybe...
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+					cmp #0
+					bne @not_covered ; Bah, you're still around... we can't repurpose you. So close.
+					; Okay, you're here, and you're not in use.
+					stx currentSprite
+					; Now, onto your regularly scheduled programming...
 				@not_covered:
 				plx
 				inx
@@ -863,15 +869,13 @@ load_current_line:
 
 
 			lda currentSprite
-			clc 
-			adc #$10
-			sta currentSprite
-			cmp #(NUM_VAR_SPRITES*16)
-			bne @okay
-				; oh noes, we looped! Go back to square 1.
-				lda #0
-				sta currentSprite
-			@okay:
+			cmp #255
+			bne @not_terrible_day
+				; Bah, okay, You've got a sprite, and we don't have space for it anywhere. Keep track and move on.
+				inc skippedSprites
+				jmp @move_on_plx
+			@not_terrible_day: 
+
 			ldx currentSprite
 			sty temp7
 
@@ -981,9 +985,9 @@ load_current_line:
 			cmp #SPRITE_TYPE_COLLECTIBLE
 			bne @not_collectible
 
-					; TODO: It's painfully inefficient to do this here... we could stop building this up before we even started
-					; Also, I lied, that wasn't the last check. ;)
-						jsr remove_existing_gems_and_boxes
+			; TODO: It's painfully inefficient to do this here... we could stop building this up before we even started
+			; Also, I lied, that wasn't the last check. ;)
+			jsr remove_existing_gems_and_boxes
 
 						
 			@not_collectible:
@@ -2204,9 +2208,9 @@ do_sprite_movement:
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
-		
-		lda #255
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+
+		lda #255
 		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
 		jmp @remove
 	
@@ -2219,11 +2223,6 @@ do_sprite_movement:
 		.endrepeat
 		tax
 
-		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
-		cmp #SPRITE_TYPE_COLLECTIBLE
-		beq @go_no_motion
-		cmp #SPRITE_TYPE_DIMENSIONER
-		beq @go_no_motion
 			
 			; Don't bother calculating gravity if the sprite isn't visible.
 			lda VAR_SPRITE_DATA, x
@@ -2264,6 +2263,13 @@ do_sprite_movement:
 				; jmp @after_remove ; Intentional fallthru
 
 			@after_remove:
+
+			; After we've done removal, if you're something that doesn't move, go away.
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+			cmp #SPRITE_TYPE_COLLECTIBLE
+			beq @go_no_motion
+			cmp #SPRITE_TYPE_DIMENSIONER
+			beq @go_no_motion
 
 			
 			lda VAR_SPRITE_DATA, x
@@ -2977,16 +2983,19 @@ do_sprite_collision:
 	cmp #SPRITE_TYPE_COLLECTIBLE
 	bne @not_collectible
 
-		jsr remove_sprite		
 		phxy
 
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
+		stx tempa
 		jsr get_bit_values_for_collectible
 		; Okay, we have the bit address... y is the offset to the addr, a is the bit mask.
 		ora COLLECTIBLE_DATA, y
 		sta COLLECTIBLE_DATA, y ; IT. IS. DONE.
 		
 		jsr update_gem_count
+		ldx tempa
+		jsr remove_sprite		
+
 
 		; Ding dong?
 		lda #SFX_COIN
@@ -3284,6 +3293,9 @@ remove_sprite:
 	ldy temp8
 	ora CURRENT_LEVEL_DATA, y
 	sta CURRENT_LEVEL_DATA, y
+
+	lda #0
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
 
 	pla
 	tay
