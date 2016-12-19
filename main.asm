@@ -44,6 +44,8 @@
 	temp9:							.res 1
 	tempa:							.res 1
 	tempb:							.res 1
+	tempc:							.res 1
+	tempd:							.res 1
 	tempCollision:					.res 1 ; Yes, this is lame.
 	playerPosition:					.res 2
 	playerScreenPosition:			.res 1
@@ -531,6 +533,9 @@ load_level:
 
 	iny
 	lda (tempAddr), y
+	; The tile editor is off by a tile due to being 1-based. Accounting for that here is easier than remembering to remove 1.
+	clc
+	adc #1
 	sta currentLevelFlagX
 
 	ldy #4
@@ -2180,11 +2185,19 @@ do_player_anim:
 
 	rts
 
+blow_away_current_sprite: 
+	lda #0
+	.repeat 16, I
+		sta EXTENDED_SPRITE_DATA+I, x
+	.endrepeat
+	rts
+
 do_sprite_movement:
 	lda levelPosition
 	pha
 	jsr seed_level_position_l_current
 	lda levelPosition
+	sta watchme
 	sta tempAddr
 	lda #0
 	sta tempAddr+1
@@ -2204,14 +2217,7 @@ do_sprite_movement:
 		jmp @no_motion
 
 	@go_away_forever:
-		lda #0
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
-
-		lda #255
-		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
+		jsr blow_away_current_sprite
 		jmp @remove
 	
 	@loop:
@@ -2239,9 +2245,11 @@ do_sprite_movement:
 				ror temp8
 			.endrepeat
 			
-			lda playerDirection
-			cmp #PLAYER_DIRECTION_LEFT
-			beq @remove_left
+			lda playerVelocity
+			cmp #0
+			beq @after_remove ; Skip removal logic if the player isn't moving at all. The logic doesn't really work if the player isn't changing levelPosition by moving.
+			cmp #PLAYER_VELOCITY_FAST+1 ; If you're going faster than the fastest speed you can muster, you must be going left
+			bcs @remove_left 
 				; Going right.
 				lda temp8
 				sec
@@ -2256,10 +2264,11 @@ do_sprite_movement:
 				lda temp8
 				sec
 				sbc levelPosition
-				; TODO: This logic isn't quite right... ends up killing off perfectly lively sprites
-				bcc @go_away_forever ; if you went below 0, that's definitely not gonna work.
-				cmp #16
+				cmp #255 ; Because of some quirkiness in the engine, we can sometimes overshoot by 1. This is explicitly okay.
+				beq @your_ok
+				cmp #15
 				bcs @go_away_forever
+				@your_ok:
 				; jmp @after_remove ; Intentional fallthru
 
 			@after_remove:

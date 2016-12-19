@@ -1,4 +1,4 @@
-.define  		BUILD 			3815  
+.define  		BUILD 			3867  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Sun 12/18/2016 19:33" 
-.define 		SPLASH_MESSAGE 	"Was being ported to a cat       The cat was not a fan. " 
+.define 		BUILD_DATE		"Sun 12/18/2016 23:55" 
+.define 		SPLASH_MESSAGE 	"Artistically challenged " 
