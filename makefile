@@ -15,6 +15,7 @@ SPLITTER=tools/readnes3/readnes3
 MAIN_EMULATOR=tools/fceux/fceux
 DEBUG_EMULATOR=tools/nintendulatordx/nintendulator
 SPACE_CHECKER=tools/nessc/nessc
+PACKBITS=tools/p8nes/winbinaries/packbits
 CONFIG_FILE=$(ROOT_DIR)/ca65-utils/nesgame-chr.cfg
 TEXT2DATA=sound/text2data
 NSF2DATA=sound/nsf2data
@@ -25,6 +26,7 @@ VERSION=0.1a
 
 LEVELS=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_tiles.asm, $(wildcard levels/*.json)))
 SPRITES=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_sprites.asm, $(wildcard levels/*.json)))
+GRAPHICS=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.chr, %.pkb, $(wildcard graphics/*.chr)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Hacky magic to read a random line from our file of splash messages.
@@ -39,7 +41,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants sound_files convert_levels convert_sprites build 
+all: generate_constants sound_files convert_levels convert_sprites convert_graphics build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -75,6 +77,10 @@ levels/processed/%_sprites.asm: levels/%.json
 
 convert_levels: $(LEVELS)
 convert_sprites: $(SPRITES)
+convert_graphics: $(GRAPHICS)
+
+graphics/processed/%.pkb: graphics/%.chr
+	$(PACKBITS) $< $@
 
 build: 
 	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main.nes -Wa "-D DEBUGGING=1" ../main.asm
@@ -120,3 +126,4 @@ clean:
 	-rm -f bin/*.dbg
 	-rm -f bin/mainDetails.txt
 	-rm -f levels/processed/*.asm
+	-rm -f graphics/processed/*.pkb

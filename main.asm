@@ -310,7 +310,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 2
+	BASE_NUMBER_OF_LEVELS = 3
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
@@ -460,19 +460,8 @@ load_graphics_data:
 		
 	store #<(default_sprite_chr), tempAddr
 	store #>(default_sprite_chr), tempAddr+1
-	ldx #0
-	ldy #0
-	set_ppu_addr $1000
-	@sprite_loop:
-		lda (tempAddr), y
-		sta PPU_DATA
-		iny
-		cpy #0
-		bne @sprite_loop
-		inx
-		inc tempAddr+1
-		cpx #$10
-		bne @sprite_loop
+
+	jsr PKB_unpackblk
 		
 	rts
 	
@@ -2538,7 +2527,7 @@ do_sprite_movement:
 
 		lda tempa
 		sbc tempAddr+1
-		; This is a workaround for a really obscure problem where when the player turns left in the first 1/4 of the first screen on a level, our sprites disappear. For some reason,
+		; This is a partial workaround for a really obscure problem where when the player turns left in the first 1/4 of the first screen on a level, our sprites disappear. For some reason,
 		; the sprites are off by a factor of $10 in this one case. (And they don't appear to be set to SPRITE_OFFsCREEN. It likely relates to something strange with levelPosition
 		; when set by seed_level_position_l[_current] is run at this point, but I can't pinpoint the issue, and nothing else seems affected.
 		; TODO: Investigate this and find a real fix to the problem.
@@ -4533,6 +4522,9 @@ nmi:
 	.include "menus.asm"
 	.include "lib/sprites.asm"
 	.include "lib/sound.asm"
+
+	; FIXME: Duplicate this into lib.
+	.include "lib/unpkb.asm"
 	
 .segment "BANK0"
 banktable
@@ -4555,12 +4547,16 @@ lvl2:
 	.include "levels/lvl2_meta.asm"
 	.include "levels/processed/lvl2_tiles.asm"
 	.include "levels/processed/lvl2_sprites.asm"
+lvl3:
+	.include "levels/lvl3_meta.asm"
+	.include "levels/processed/lvl3_tiles.asm"
+	.include "levels/processed/lvl3_sprites.asm"
 
 leveldata_table:
 	.if DEBUGGING = 1 
-		.word lvldebug, lvl1, lvl2
+		.word lvldebug, lvl1, lvl2, lvl3
 	.else
-		.word lvl1, lvl2
+		.word lvl1, lvl2, lvl3
 	.endif
 
 
@@ -4568,10 +4564,10 @@ default_chr:
 	.incbin "graphics/map_tiles.chr"
 	
 default_sprite_chr:
-	.incbin "graphics/sprites.chr"
+	.incbin "graphics/processed/sprites.pkb"
 
 menu_chr_data: 
-	.incbin "graphics/title_tiles.chr"
+	.incbin "graphics/processed/title_tiles.pkb"
 
 	
 default_palettes: 

@@ -36,21 +36,11 @@ load_menu:
 		cpy #$20
 		bne @palette_loop
 
+	set_ppu_addr $0000
 	store #<(menu_chr_data), tempAddr
 	store #>(menu_chr_data), tempAddr+1
-	ldx #0
-	ldy #0
-	set_ppu_addr $0000
-	@title_loop:
-		lda (tempAddr), y
-		sta PPU_DATA
-		iny
-		cpy #0
-		bne @title_loop
-		inx
-		inc tempAddr+1
-		cpx #$10
-		bne @title_loop
+	jsr PKB_unpackblk
+
 		
 	; wipe out the nametable so we don't have any leftovers.
 	set_ppu_addr $2000
@@ -82,8 +72,8 @@ load_menu:
 load_title:
 	jsr load_menu
 
-	write_string "No Name 2016", $2066
-	write_string "NESDev Compo Entry", $20a6
+	write_string "Waddles the Duck", $2067
+	write_string "NESDev 2016 Compo Entry", $20a4
 	
 	.if SHOW_VERSION_STRING = 1
 		set_ppu_addr $2320

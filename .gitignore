@@ -10,7 +10,11 @@ tools/readnes3/*
 !tools/readnes3/README.md
 tools/uploader/*
 !tools/uploader/README.md
+tools/p8nes/*
+!tools/p8nes/README.md
 *.o
 .vscode
 levels/processed/*
 !levels/processed/empty
+graphics/processed/*
+!graphics/processed/empty
