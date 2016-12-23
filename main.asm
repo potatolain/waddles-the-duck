@@ -17,13 +17,13 @@
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
-; $400-41f: Current level data.
+; $400-41f: Unused
 ; $420-4ff: Static collectible data
 ; $500-55f: Screen buffer
 ; $560-5ff: Unused
 ; $600-6ff: Map data
 ; $700-7bf: Extended sprite data
-; $7c0-7ff: Unused
+; $7c0-7ff: Current level collectible data
 
 		
 .segment "ZEROPAGE"
@@ -102,30 +102,33 @@
 	isOnIce:						.res 1
 	gameBeaten:						.res 1
 
-	CHAR_TABLE_START 			= $e0
-	NUM_SYM_TABLE_START	 		= $d0
-	CHAR_SPACE					= $ff
-	COLLECTIBLE_DATA			= $420
-	COLLECTIBLE_DATA_LENGTH		= $d9 ; Don't add in magical byte
-	MAGICAL_BYTE				= $4ff
-	MAGICAL_BYTE_VALUE			= $db
-	SCREEN_DATA					= $600
-	NEXT_ROW_CACHE				= $500
-	NEXT_ROW_ATTRS				= $540 ; This could share space with cache if needed.
-	EXTENDED_SPRITE_DATA		= $700
-	LEFT_ATTR_MASK				= %00110011
-	RIGHT_ATTR_MASK				= %11001100
-	SPRITE_DATA					= $200
-	SPRITE_ZERO					= $200
-	PLAYER_SPRITE				= $210
-	PLAYER_BOTTOM_SPRITE		= PLAYER_SPRITE+12
-	PLAYER_SPRITE_ID			= $c6
-	FIRST_VAR_SPRITE			= $230
-	VAR_SPRITE_DATA				= FIRST_VAR_SPRITE
-	LAST_VAR_SPRITE				= $2fc
-	NUM_VAR_SPRITES				= 12
-	CURRENT_LEVEL_DATA			= $400
-	CURRENT_LEVEL_DATA_LENGTH	= $20
+
+	CHAR_TABLE_START 				= $e0
+	NUM_SYM_TABLE_START	 			= $d0
+	CHAR_SPACE						= $ff
+	COLLECTIBLE_DATA				= $420
+	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
+	MAGICAL_BYTE					= $4ff
+	MAGICAL_BYTE_VALUE				= $db
+	SCREEN_DATA						= $600
+	NEXT_ROW_CACHE					= $500
+	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
+	EXTENDED_SPRITE_DATA			= $700
+	LEFT_ATTR_MASK					= %00110011
+	RIGHT_ATTR_MASK					= %11001100
+	SPRITE_DATA						= $200
+	SPRITE_ZERO						= $200
+	PLAYER_SPRITE					= $210
+	PLAYER_BOTTOM_SPRITE			= PLAYER_SPRITE+12
+	PLAYER_SPRITE_ID				= $c6
+	FIRST_VAR_SPRITE				= $230
+	VAR_SPRITE_DATA					= FIRST_VAR_SPRITE
+	LAST_VAR_SPRITE					= $2fc
+	NUM_VAR_SPRITES					= 12
+	CURRENT_LEVEL_DATA				= $7c0
+	CURRENT_LEVEL_DATA_B			= $7e0
+	CURRENT_LEVEL_DATA_LENGTH		= $40
+	CURRENT_LEVEL_DATA_TILE_LENGTH 	= $20
 	
 	PLAYER_VELOCITY_NORMAL 		= $01
 	PLAYER_VELOCITY_FAST		= $02
@@ -782,6 +785,7 @@ load_current_line:
 	ldy #0
 	ldx #0
 	@loop_sprites:
+		store #0, tempd ; offset to sprite y.
 		lda (lvlSpriteDataAddr), y
 		cmp #$ff
 		bne @not_done_sprites
@@ -793,10 +797,10 @@ load_current_line:
 		@dont_move_on:
 			store #0, temp1 ; Position of the byte
 			store #255, currentSprite
+			stx temp3 ; Store the original number for later use, before we consume it.
 			txa
 			pha 
 			lda #%00000001
-			stx temp3 ; Store the original number for later use, before we consume it.
 			@loop_for_mask:
 				asl
 				bcc @not_relooping
@@ -808,15 +812,57 @@ load_current_line:
 				bne @loop_for_mask
 				; Okay, temp1 is now the index off of CURRENT_LEVEL_DATA, and a is the mask. Sooo...
 				ldx temp1
+				sta tempc
+				iny
+				iny
+				lda (lvlSpriteDataAddr), y
+				sta tempb
+				dey
+				dey
+
+				lda tempb
+				cmp #SPRITE_TYPE_COLLECTIBLE
+				bne @not_collectible_grabbable
+					; It's a collectible... lets see if its been hit before.
+					lda tempc
+					and CURRENT_LEVEL_DATA_B, x
+					cmp #0
+					beq @not_collectible_grabbable
+						; If it's found in here, someone hit it before. Elevate it up.
+						lda #16
+						sta tempd
+						; we know that the data in the buffer is wrong, too... so let's correct it
+						phx
+							iny
+							lda (lvlSpriteDataAddr), y
+							dey
+							asl ; Tiles are 2x tall...
+							tax
+							lda #(TILE_QUESTION_BLOCK+1<<2)
+							sta NEXT_ROW_CACHE, x
+							lda #(TILE_QUESTION_BLOCK+1<<2)+$10 ; This goes down in a column, so... tile id goes up to next row.
+							inx
+							sta NEXT_ROW_CACHE, x
+							; Next col too
+							txa
+							clc
+							adc #$1f
+							tax
+							lda #(TILE_QUESTION_BLOCK+1<<2)+$1
+							sta NEXT_ROW_CACHE, x
+							lda #(TILE_QUESTION_BLOCK+1<<2)+$11 ; This goes down in a column, so... tile id goes up to next row.
+							inx
+							sta NEXT_ROW_CACHE, x
+
+						plx
+				@not_collectible_grabbable:
+
+				lda tempc
 				and CURRENT_LEVEL_DATA, x
 				cmp #0
 				beq @dun_move_on
 					; Bit of a hack... if we detect this is a gem, show it anyway (so we can detect which question blocks are in which state efficiently)
-					iny
-					iny
-					lda (lvlSpriteDataAddr), y
-					dey
-					dey
+					lda tempb
 					cmp #SPRITE_TYPE_COLLECTIBLE
 					bne @really_move_on
 						jmp @dun_move_on
@@ -887,13 +933,24 @@ load_current_line:
 			.repeat 4
 				asl
 			.endrepeat
+			sec
+			sbc tempd
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			iny
 			lda (lvlSpriteDataAddr), y ; sprite id.
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
 			iny
+			lda tempd
+			cmp #0
+			beq @normal_extra
+				; If tempd is set, that means a linked gem box has been hit. Ignore extra data
+				lda #0
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				jmp @after_extra
+			@normal_extra:
 			lda (lvlSpriteDataAddr), y ; Extra data
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+			@after_extra:
 			lda #0
 			sta tempAddr+1
 			lda tempa
@@ -1430,7 +1487,7 @@ do_special_tile_stuff:
 			; We actually found it. Set the extra byte to show it, and also update the tile to show it has been hit.
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, y
 			cmp #SPRITE_DATA_EXTRA_IS_HIDDEN
-			bne @its_gone ; Jumping up a bit... basically, your tile was already gotten, so get outta here.
+			bne @its_gone ; Jumping up a bit... basically, your gem was already gotten, so get outta here.
 			lda #0
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, y
 
@@ -1439,6 +1496,19 @@ do_special_tile_stuff:
 			sec
 			sbc #16
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, y
+
+			stx tempc
+			sty tempd
+
+			ldx tempd
+			jsr get_gem_update_data
+
+			; Store that you hit this gem box in the secondary set of level data.
+			ldy temp8
+			ora CURRENT_LEVEL_DATA_B, y
+			sta CURRENT_LEVEL_DATA_B, y
+			ldx tempc
+			ldy tempd
 
 			store tempCollisionTilePos,	 arbitraryTileUpdatePos
 			store #TILE_QUESTION_BLOCK+1, arbitraryTileUpdateId
@@ -3279,21 +3349,9 @@ remove_sprite:
 	sta VAR_SPRITE_DATA+12, x
 
 	; Also update level data...
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
-	tay
-	store #0, temp8
-	lda #1
-	@loop_indexer:
-		asl
-		bcc @no_reloop
-			inc temp8
-			lda #1
-		@no_reloop:
-		dey
-		cpy #255 ; Make sure we actually calculate the 0 run.
-		bne @loop_indexer
+	jsr get_gem_update_data
 
-		; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
+	; Okay, temp0 is now the index off CURRENT_LEVEL_DATA, and a is the mask...
 	ldy temp8
 	ora CURRENT_LEVEL_DATA, y
 	sta CURRENT_LEVEL_DATA, y
@@ -3303,6 +3361,24 @@ remove_sprite:
 
 	pla
 	tay
+	rts
+
+; Bit of a weird method... expects to have a 2 bit value to apply in tempc, and x as a sprite offset.
+; Returns byte offset in temp8, and bit mask in a
+get_gem_update_data:
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
+	tay
+	store #0, temp8
+	lda #%00000001
+	@loop_indexer:
+		asl
+		bcc @no_reloop
+			inc temp8
+			lda #%00000001
+		@no_reloop:
+		dey
+		cpy #255 ; Make sure we actually calculate the 0 run.
+		bne @loop_indexer
 	rts
 
 update_gem_count:
