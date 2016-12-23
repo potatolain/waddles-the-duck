@@ -17,12 +17,15 @@ var path = require('path'),
 	SPRITE_START_ID = 256,
 	SPRITE_HIDDEN = 255,
 	TILE_QUESTION_BLOCK = 2,
+	SPRITE_COLLECTIBLE = 0,
 	NL = "\n",
 	
 	levelInfo, 
 	isVerbose = false,
 	lvlName = null,
 	file = null,
+	numSprites = 0,
+	numCollectibles = 0,
 	outFile = null;
 
 function printUsage() {
@@ -143,6 +146,10 @@ for (var y = 0; y < height; y++) {
 			if (tileData[y*width + x] == TILE_QUESTION_BLOCK) {
 				spriteData = SPRITE_HIDDEN;
 			}
+			if (data[y*width + x] - SPRITE_START_ID == 0) {
+				numCollectibles++;
+			}
+			numSprites++;
 			spriteDefs.push({x: x, y: y, id: data[y*width + x] - SPRITE_START_ID, data: spriteData});
 		}
 	}
@@ -157,6 +164,9 @@ fileData =
 	'; Generated on ' + (new Date()).toLocaleString() + ' by ' + packageData.name + ' version ' + packageData.version + NL +
 	'; Format is: x, y, id, data' + NL +
 	'; ' + NL + 
+	NL +
+	lvlName.toUpperCase()+'_SPRITE_COUNT=' + numSprites + NL +
+	lvlName.toUpperCase()+'_COLLECTIBLE_COUNT=' + numCollectibles + NL +
 	NL + 
 	NL + 
 	lvlName+'_sprites:' + NL;
@@ -176,4 +186,4 @@ fs.writeFileSync(outFile, fileData);
 out('Successfully wrote ' + lvlName + ' out to "' + outFile + '".');
 
 verbose('Exiting successfully!');
-process.exit(0);
+process.exit(0); 

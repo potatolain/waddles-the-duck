@@ -1,3 +1,6 @@
+TITLE_CURSOR_X_OFFSET = 32
+TITLE_CURSOR_Y_OFFSET = 78
+
 load_menu: 
 
 	; Reset scrolling to 0
@@ -41,7 +44,10 @@ load_menu:
 	store #>(menu_chr_data), tempAddr+1
 	jsr PKB_unpackblk
 
-		
+	store #<(default_sprite_chr), tempAddr
+	store #>(default_sprite_chr), tempAddr+1
+	jsr PKB_unpackblk
+
 	; wipe out the nametable so we don't have any leftovers.
 	set_ppu_addr $2000
 	ldx #0
@@ -100,8 +106,73 @@ load_title:
 			cpx #0
 			bne @loop_clear2
 		
-		write_string .sprintf("Debug mode enabled"), $2301, 
+		write_string .sprintf("Debug mode enabled"), $2301
 	.endif
+
+	lda gameBeaten
+	cmp #0
+	bne @gems
+	jmp load_title_no_gems
+	@gems:
+		; Show gem count and level select if you've beaten the game once.
+		write_string .sprintf("Gems: "), $20e8
+
+		jsr get_game_gem_count
+		draw_current_num
+
+		lda #$ff
+		sta PPU_DATA
+		lda #NUM_SYM_TABLE_START+$b
+		sta PPU_DATA
+		lda #$ff
+		sta PPU_DATA 
+
+
+		jsr get_game_gem_total
+		draw_current_num
+
+		; Quick and dirty in-place macro to draw gem count based on the level.
+		.macro draw_gem_count I, baseCount
+			.local BINARY_COUNT, BINARY_TOTAL
+			BINARY_TOTAL = ((I .mod 10) + (I / 10) * 16)
+
+			lda baseCount
+			draw_current_num
+			lda #$ff
+			sta PPU_DATA
+			lda #NUM_SYM_TABLE_START+$b
+			sta PPU_DATA
+			lda #$ff
+			sta PPU_DATA
+			lda #BINARY_TOTAL
+			draw_current_num
+
+		.endmacro
+
+		; NOTE: We're depending on the return value of get_level_gem_count being in temp1 here.
+		.repeat NUMBER_OF_LEVELS, I
+			.if I = 0 && DEBUGGING = 1
+				; Debugging level gets a special case, since we want level numbers to match with/without debugging.
+				write_string .sprintf("Level DD  "), $2146+I*$20
+				lda #I
+				jsr get_level_gem_count
+				draw_gem_count LVL_DEBUG_COLLECTIBLE_COUNT, temp1
+			.elseif DEBUGGING = 1
+				; Unfortunately since we added a special debugging level, we need separate logic for showing level numbers based on that.
+				write_string .sprintf("Level %02d  ", I), $2146+I*$20
+				lda #I
+				jsr get_level_gem_count
+				draw_gem_count (.ident(.concat("LVL",.string(I),"_COLLECTIBLE_COUNT"))), temp1
+			.else
+				write_string .sprintf("Level %02d  ", I+1), $2146+I*$20
+				lda #I
+				jsr get_level_gem_count
+				draw_gem_count (.ident(.concat("LVL",.string(I+1),"_COLLECTIBLE_COUNT"))), temp1
+			.endif
+		.endrepeat
+
+
+	load_title_no_gems:
 	
 	jsr enable_all
 	reset_ppu_scrolling
@@ -109,6 +180,8 @@ load_title:
 
 show_title: 
 	jsr load_title
+	lda #0
+	sta temp5 ; Cursor offset if you have level select enabled.
 	
 	@loopa: 
 		jsr sound_update
@@ -126,8 +199,56 @@ show_title:
 		and #CONTROLLER_START
 		bne @game_time
 
+		lda gameBeaten
+		cmp #0
+		beq @no_level_select
+
+			lda ctrlButtons
+			and #CONTROLLER_UP
+			beq @no_up
+				lda lastCtrlButtons
+				and #CONTROLLER_UP
+				bne @no_up
+				lda temp5
+				cmp #0
+				beq @no_up
+				dec temp5
+				lda #SFX_MENU
+				ldx #FT_SFX_CH0
+				jsr sfx_play
+			@no_up:
+			lda ctrlButtons
+			and #CONTROLLER_DOWN
+			beq @no_down
+				lda lastCtrlButtons
+				and #CONTROLLER_DOWN
+				bne @no_down
+				lda temp5
+				cmp #NUMBER_OF_LEVELS-1
+				bcs @no_down
+				inc temp5
+				lda #SFX_MENU
+				ldx #FT_SFX_CH0
+				jsr sfx_play
+
+			@no_down:
+
+			lda #SPRITE_POINTER
+			sta VAR_SPRITE_DATA+1
+			lda temp5
+			asl
+			asl
+			asl ; multiply offset by 8
+			adc #TITLE_CURSOR_Y_OFFSET
+			sta VAR_SPRITE_DATA
+			lda #TITLE_CURSOR_X_OFFSET
+			sta VAR_SPRITE_DATA+3
+		@no_level_select:
+
 		jmp @loopa
 	@game_time: 
+		lda temp5
+		sta currentLevel
 		lda #SFX_MENU
 		ldx #FT_SFX_CH0
 		jsr sfx_play

@@ -100,11 +100,13 @@
 	arbitraryTileNametableOffset:	.res 1
 	arbitraryTileAddr:				.res 2
 	isOnIce:						.res 1
+	gameBeaten:						.res 1
 
 	CHAR_TABLE_START 			= $e0
 	NUM_SYM_TABLE_START	 		= $d0
 	CHAR_SPACE					= $ff
 	COLLECTIBLE_DATA			= $420
+	COLLECTIBLE_DATA_LENGTH		= $d9 ; Don't add in magical byte
 	MAGICAL_BYTE				= $4ff
 	MAGICAL_BYTE_VALUE			= $db
 	SCREEN_DATA					= $600
@@ -213,6 +215,7 @@
 
 	SPRITE_DYING			= $0c
 	SPRITE_PAUSE_LETTERS	= $e0
+	SPRITE_POINTER			= $f3
 
 	; How many frames to show the "ready" screen for.
 	READY_TIME				= 48
@@ -419,6 +422,10 @@ ldy #>(all_sfx)
 jsr sfx_init
 
 store #0, currentLevel
+
+.if DEBUGGING = 1
+	store #1, gameBeaten
+.endif
 
 	
 jsr disable_all
@@ -3365,6 +3372,83 @@ update_total_gem_count:
 	@done_level_data_loop:
 	rts
 
+get_game_gem_count:
+	lda #0
+	sta temp1
+	ldx #0
+	@loop:
+		ldy #0
+		lda COLLECTIBLE_DATA, x
+		@inner_loop:
+			clc
+			asl
+			pha
+			bcc @no_add
+				inc temp1
+				lda temp1
+				and #%00001111
+				cmp #10
+				bne @no_bump
+					lda temp1
+					clc
+					adc #6 ; bump to next level
+					sta temp1
+				@no_bump:
+			@no_add:
+			pla
+			iny
+			cpy #8
+			bne @inner_loop
+		inx
+		cpx #COLLECTIBLE_DATA_LENGTH
+		bne @loop
+		lda temp1
+
+	rts
+
+get_level_gem_count:
+	asl
+	asl ; Each level gets 4 bytes = 32 total coins. 1 bit per.
+	tax
+	ldy #0
+	sty temp1
+	@loop:
+		phy
+		ldy #0
+		lda COLLECTIBLE_DATA, x
+		@inner_loop: 
+			clc
+			asl
+			pha
+			bcc @no_add
+				inc temp1
+				lda temp1
+				and #%00001111
+				cmp #10
+				bne @no_bump	
+					lda temp1
+					clc
+					adc #6 ; bump to next level
+					sta temp1
+				@no_bump:
+			@no_add:
+			pla
+			iny
+			cpy #8
+			bne @inner_loop
+
+		ply
+		iny
+		inx
+		cpy #4
+		bne @loop
+		lda temp1
+		rts
+
+get_game_gem_total:
+	; This looks really gross... all it's doing is taking our total count, and converting it to BCD... each hex digit is now a decimal digit.
+	lda #((GAME_GEM_TOTAL .MOD 10) + ((GAME_GEM_TOTAL / 10) * 16))
+	rts
 	
 .macro do_x_velocity_lock DIRECTION, MAX_DIST, VEL_FAST, VEL_NORMAL
 	.local @we_are_ok, @skip_inc, @done_macro, @okay, @normal
@@ -4385,6 +4469,7 @@ do_next_level:
 	lda currentLevel
 	cmp #NUMBER_OF_LEVELS
 	bne @just_go
+		store #1, gameBeaten
 		jsr game_end
 	@just_go:
 	rts
@@ -4523,19 +4608,19 @@ nmi:
 	.include "lib/sprites.asm"
 	.include "lib/sound.asm"
 
-	; FIXME: Duplicate this into lib.
 	.include "lib/unpkb.asm"
 	
 .segment "BANK0"
 banktable
 
 .if DEBUGGING = 1
-
+	GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT
 	lvldebug:
 		.include "levels/lvl_debug_meta.asm"
 		.include "levels/processed/lvl_debug_tiles.asm"
 		.include "levels/processed/lvl_debug_sprites.asm"
-
+.else
+	GAME_GEM_TOTAL = LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT
 .endif
 
 lvl1:

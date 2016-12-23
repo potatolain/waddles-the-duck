@@ -56,18 +56,18 @@
 			char .set .strat(text, I) - $41 + CHAR_TABLE_START
 		.elseif (char >= 'a' .and char <= 'z') ; lowercase
 			char .set .strat(text, I) - $61 + CHAR_TABLE_START
-		.elseif (char >= '1' .and char <= '9') ; numbers (non-zero)
-			char .set .strat(text, I) - $31 + NUM_SYM_TABLE_START
-		.elseif (char = '0') ; zero (same as letter O to save space)
-			char .set CHAR_TABLE_START + $0e
+		.elseif (char >= '0' .and char <= '9') ; numbers (non-zero)
+			char .set .strat(text, I) - $30 + NUM_SYM_TABLE_START
 		.elseif (char = '.')
 			char .set CHAR_TABLE_START+$1b
 		.elseif (char = ':')
-			char .set NUM_SYM_TABLE_START + $09
-		.elseif (char = '/')
 			char .set NUM_SYM_TABLE_START + $0a
-		.elseif (char = '!')
+		.elseif (char = '/')
 			char .set NUM_SYM_TABLE_START + $0b
+		.elseif (char = '!')
+			char .set NUM_SYM_TABLE_START + $0c
+		.elseif (char = '=')
+			char .set NUM_SYM_TABLE_START + $0d
 		.elseif (char = '?')
 			char .set NUM_SYM_TABLE_START + $0e
 		.elseif (char = '^')
@@ -169,4 +169,20 @@
 ; As a result, we need to stick this in all banks slated for $8000
 .macro banktable
   .byte $00, $01, $02, $03, $04, $05, $06
+.endmacro
+
+.macro draw_current_num
+	sta macroTmp
+	.repeat 4
+		lsr
+	.endrepeat
+	clc
+	adc #NUM_SYM_TABLE_START
+	sta PPU_DATA
+	lda macroTmp
+	and #%00001111
+	clc
+	adc #NUM_SYM_TABLE_START
+	sta PPU_DATA
+
 .endmacro
