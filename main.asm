@@ -1294,11 +1294,9 @@ draw_current_nametable_row:
 	store nametableAddr, PPU_ADDR
 
 
-	ldx #0
-	.repeat 24 ; Use an unrolled loop to do things a bit faster, at a cost of rom space.
-		lda NEXT_ROW_CACHE, x
+	.repeat 24, I ; Use an unrolled loop to do things a bit faster, at a cost of rom space.
+		lda NEXT_ROW_CACHE+I
 		sta PPU_DATA
-		inx
 	.endrepeat
 		
 	lda PPU_STATUS
@@ -1313,11 +1311,9 @@ draw_current_nametable_row:
 	lda nametableAddr
 	sta PPU_ADDR
 	
-	ldx #32
-	.repeat 24 ; ditto
-		lda NEXT_ROW_CACHE, x
+	.repeat 24, I ; ditto
+		lda NEXT_ROW_CACHE+I+32
 		sta PPU_DATA
-		inx
 	.endrepeat
 
 	lda levelPosition
@@ -1345,13 +1341,13 @@ draw_current_nametable_row:
 		sta tempAddr
 		ldx #0
 		
-		.repeat 6
+		.repeat 6, I
 			lda PPU_DATA ; dummy read to get the right value, caching, etc...
 			lda temp1
 			eor #$ff ; flip all bits
 			and PPU_DATA ; Grab data and immediately strip out the new bits. 
 			sta temp2
-			lda NEXT_ROW_ATTRS, x ; combine with values...
+			lda NEXT_ROW_ATTRS+I ; combine with values...
 			and temp1
 			ora temp2 ; mischief managed.
 			sta temp2
@@ -1370,7 +1366,6 @@ draw_current_nametable_row:
 			sta tempAddr
 			sta PPU_ADDR
 			
-			inx
 		.endrepeat
 		; Write one last time w/o the memory stuffs.
 		lda PPU_DATA ; dummy read to get the right value, caching, etc...
@@ -1378,7 +1373,7 @@ draw_current_nametable_row:
 		eor #$ff ; flip all bits
 		and PPU_DATA ; Grab data and immediately strip out the new bits. 
 		sta temp2
-		lda NEXT_ROW_ATTRS, x ; combine with values...
+		lda NEXT_ROW_ATTRS+6 ; combine with values...
 		and temp1
 		ora temp2 ; mischief managed.
 		sta temp2
