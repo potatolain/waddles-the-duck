@@ -178,9 +178,10 @@
 	TILE_ROW_END_OF_DAYS		= $a
 
 
-	MIN_POSITION_LEFT_SCROLL		= $70
+	; TODO: The logic around this could probably be axed at this point - we just always scroll if you're not at the start/end of the level.
+	MIN_POSITION_LEFT_SCROLL		= $80
 	MIN_POSITION_RIGHT_SCROLL		= $80
-	MIN_LEFT_LEVEL_POSITION 		= $02
+	MIN_LEFT_LEVEL_POSITION 		= $04
 
 	MIN_SPRITE_GRAVITY_X		= $30
 	MAX_SPRITE_GRAVITY_X		= $b0
