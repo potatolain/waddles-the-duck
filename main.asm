@@ -2207,9 +2207,9 @@ do_player_movement:
 do_player_anim:
 	lda playerVelocity
 	cmp #PLAYER_VELOCITY_FAST
-	bne @slow
+	beq @fast
 	cmp #256-PLAYER_VELOCITY_FAST
-	bne @slow
+	beq @fast
 
 		lda frameCounter
 		and #%000001000
@@ -2217,7 +2217,7 @@ do_player_anim:
 		lsr
 		lsr
 		jmp @do_anim
-	@slow: 
+	@fast: 
 		lda frameCounter
 		and #%00000100
 		lsr
