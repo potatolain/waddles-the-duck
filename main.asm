@@ -100,7 +100,6 @@
 	arbitraryTileNametableOffset:	.res 1
 	arbitraryTileAddr:				.res 2
 	isOnIce:						.res 1
-	gameBeaten:						.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -110,6 +109,7 @@
 	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
 	MAGICAL_BYTE					= $4ff
 	MAGICAL_BYTE_VALUE				= $db
+	GAME_BEATEN_BYTE				= $4fe
 	SCREEN_DATA						= $600
 	NEXT_ROW_CACHE					= $500
 	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
@@ -428,7 +428,7 @@ jsr sfx_init
 store #0, currentLevel
 
 .if DEBUGGING = 1
-	store #1, gameBeaten
+	store #1, GAME_BEATEN_BYTE
 .endif
 
 	
@@ -4541,7 +4541,7 @@ do_next_level:
 	lda currentLevel
 	cmp #NUMBER_OF_LEVELS
 	bne @just_go
-		store #1, gameBeaten
+		store #1, GAME_BEATEN_BYTE
 		jsr game_end
 	@just_go:
 	rts

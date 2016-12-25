@@ -109,7 +109,7 @@ load_title:
 		write_string .sprintf("Debug mode enabled"), $2301
 	.endif
 
-	lda gameBeaten
+	lda GAME_BEATEN_BYTE
 	cmp #0
 	bne @gems
 	jmp load_title_no_gems
@@ -199,7 +199,7 @@ show_title:
 		and #CONTROLLER_START
 		bne @game_time
 
-		lda gameBeaten
+		lda GAME_BEATEN_BYTE
 		cmp #0
 		beq @no_level_select
 
