@@ -100,6 +100,7 @@
 	arbitraryTileNametableOffset:	.res 1
 	arbitraryTileAddr:				.res 2
 	isOnIce:						.res 1
+	pauseOption:					.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -244,6 +245,7 @@
 	SFX_MENU_DOWN	= 10
 	SFX_DEATH		= 11
 	SFX_BLOCK_HIT	= 12
+	SFX_MENU_TICK	= 13
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -3260,7 +3262,7 @@ do_player_death:
 		bne @loop_snd
 	ldx #$ff
 	txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
-	jmp show_ready ; FIXME: Probably should have something else happen on death.
+	jmp show_ready
 
 ; Start squish animation for a sprite at position x
 squish_sprite:
@@ -4468,11 +4470,37 @@ do_pause_screen:
 	sta VAR_SPRITE_DATA+25
 	sta VAR_SPRITE_DATA+29
 
+	store #SPRITE_PAUSE_LETTERS+4, VAR_SPRITE_DATA+33
+	store #SPRITE_PAUSE_LETTERS+2, VAR_SPRITE_DATA+37
+	store #SPRITE_PAUSE_LETTERS+$11, VAR_SPRITE_DATA+41
+	store #SPRITE_PAUSE_LETTERS+$14, VAR_SPRITE_DATA+45
+	store #SPRITE_PAUSE_LETTERS+$15, VAR_SPRITE_DATA+49
+	store #SPRITE_PAUSE_LETTERS+2, VAR_SPRITE_DATA+53
+
+	store #SPRITE_PAUSE_LETTERS+4, VAR_SPRITE_DATA+57
+	store #SPRITE_PAUSE_LETTERS+2, VAR_SPRITE_DATA+61
+	store #SPRITE_PAUSE_LETTERS+$11, VAR_SPRITE_DATA+65
+	store #SPRITE_PAUSE_LETTERS+5, VAR_SPRITE_DATA+69
+	store #SPRITE_PAUSE_LETTERS+1, VAR_SPRITE_DATA+73
+	store #SPRITE_PAUSE_LETTERS+4, VAR_SPRITE_DATA+77
+	store #SPRITE_PAUSE_LETTERS+5, VAR_SPRITE_DATA+81
+	store #SPRITE_POINTER, VAR_SPRITE_DATA+85
+
 	; Don't touch palettes here - most sprites should have a non-duck color, meaning we can rely on them.
 
-	lda #$60
+	lda #$60 ; paused text
 	.repeat 8, I
 		sta VAR_SPRITE_DATA+(I*4)
+	.endrepeat
+
+	lda #$a0 ; Resume
+	.repeat 8, I
+		sta VAR_SPRITE_DATA+(32+(I*4))
+	.endrepeat
+
+	lda #$a8 ; restart
+	.repeat 8, I
+		sta VAR_SPRITE_DATA+(56+(I*4))
 	.endrepeat
 
 	lda #$60
@@ -4485,30 +4513,87 @@ do_pause_screen:
 	lda #$50
 	sta VAR_SPRITE_DATA+27
 
+	lda #$60 ; Resume
+	.repeat 6, I
+		sta VAR_SPRITE_DATA + 32 + (I*4) + 3
+		adc #8
+	.endrepeat
+
+	lda #$60 ; Restart
+	.repeat 7, I
+		sta VAR_SPRITE_DATA + 56 + (I * 4) + 3
+		adc #8
+	.endrepeat
+
+	lda #$50
+	sta VAR_SPRITE_DATA+87
+
 	lda #1
 	jsr music_pause
+
+	store #0, pauseOption
 
 	lda #SFX_MENU
 	ldx #FT_SFX_CH0
 	jsr sfx_play
 
 	@loop_pause_screen:
+		lda pauseOption
+		asl
+		asl
+		asl
+		clc
+		adc #$a0
+		sta VAR_SPRITE_DATA+84
+		
 		jsr read_controller
 		
 		lda ctrlButtons
-		and #CONTROLLER_START
+		and #CONTROLLER_START|CONTROLLER_A
 		beq @done_start
 			lda lastCtrlButtons
-			and #CONTROLLER_START
+			and #CONTROLLER_START|CONTROLLER_A
 			bne @done_start
-			jmp @escape_pause
+			lda pauseOption
+			cmp #0
+			beq @escape_pause
+			jmp @escape_pause_harder
 		@done_start:
+
+		lda ctrlButtons
+		and #CONTROLLER_UP
+		beq @done_up
+			lda pauseOption
+			cmp #0
+			beq @done_up
+			store #0, pauseOption
+			lda #SFX_MENU_TICK
+			ldx #FT_SFX_CH0
+			jsr sfx_play
+		@done_up:
+		lda ctrlButtons
+		and #CONTROLLER_DOWN
+		beq @done_down
+			lda pauseOption
+			cmp #1
+			beq @done_down
+			store #1, pauseOption
+			lda #SFX_MENU_TICK
+			ldx #FT_SFX_CH0
+			jsr sfx_play
+		@done_down:
+
 
 		jsr sound_update
 		jsr vblank_wait
 		jsr do_sprite0
 
 	jmp @loop_pause_screen
+
+	@escape_pause_harder: ; If you were really done, restart the level for you.
+		ldx #$ff
+		txs ; Another instance where we rewrite the stack pointer to avoid doing bad things.
+		jmp show_ready
 
 	@escape_pause:
 		; Turn off 32 bit adding
