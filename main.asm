@@ -103,6 +103,7 @@
 	arbitraryTileAddr:				.res 2
 	isOnIce:						.res 1
 	pauseOption:					.res 1
+	hasStompedSprite:				.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -2732,6 +2733,8 @@ do_sprite_movement:
 	rts
 
 test_sprite_collision:
+	lda #0
+	sta hasStompedSprite
 	lda PLAYER_SPRITE
 	clc
 	adc #PLAYER_HEIGHT
@@ -2786,6 +2789,30 @@ test_sprite_collision:
 		tax
 		cpx #(NUM_VAR_SPRITES*16)
 		bne @loop
+
+	; Did you stomp anything? If so, we should do a little updating...
+	lda hasStompedSprite
+	cmp #1
+	bne @no_stompy
+
+		lda #PLAYER_VELOCITY_JUMPING
+		sta playerYVelocity
+		lda playerVelocity
+		cmp #PLAYER_VELOCITY_FAST
+		beq @fast
+		cmp #256-PLAYER_VELOCITY_FAST
+		beq @fast
+			lda #PLAYER_JUMP_TIME
+			jmp @do_jump
+		@fast: 
+			lda #PLAYER_JUMP_TIME_RUN
+		@do_jump:
+		sta flightTimer
+
+		lda #HOP_LOCK_TIME
+		sta playerYVelocityLockTime
+
+	@no_stompy:
 	rts
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
@@ -3108,23 +3135,7 @@ do_sprite_collision:
 		@above:
 			jsr squish_sprite
 
-			lda #PLAYER_VELOCITY_JUMPING
-			sta playerYVelocity
-			lda playerVelocity
-			cmp #PLAYER_VELOCITY_FAST
-			beq @fast
-			cmp #256-PLAYER_VELOCITY_FAST
-			beq @fast
-				lda #PLAYER_JUMP_TIME
-				jmp @do_jump
-			@fast: 
-				lda #PLAYER_JUMP_TIME_RUN
-			@do_jump:
-			sta flightTimer
-
-			lda #HOP_LOCK_TIME
-			sta playerYVelocityLockTime
-
+		store #1, hasStompedSprite
 		
 		rts
 	@not_jumpable:
