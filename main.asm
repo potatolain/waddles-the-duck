@@ -46,6 +46,8 @@
 	tempb:							.res 1
 	tempc:							.res 1
 	tempd:							.res 1
+	tempe:							.res 1
+	tempf:							.res 1
 	tempCollision:					.res 1 ; Yes, this is lame.
 	playerPosition:					.res 2
 	playerScreenPosition:			.res 1
@@ -2294,11 +2296,6 @@ do_sprite_movement:
 		tax
 
 			
-			; Don't bother calculating gravity if the sprite isn't visible.
-			lda VAR_SPRITE_DATA, x
-			cmp #SPRITE_OFFSCREEN
-			beq @go_no_motion
-
 			; Start of left/right logic
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 			sta temp8
@@ -2309,32 +2306,45 @@ do_sprite_movement:
 				ror temp8
 			.endrepeat
 			
-			lda playerVelocity
-			cmp #0
-			beq @after_remove ; Skip removal logic if the player isn't moving at all. The logic doesn't really work if the player isn't changing levelPosition by moving.
-			cmp #PLAYER_VELOCITY_FAST+1 ; If you're going faster than the fastest speed you can muster, you must be going left
-			bcs @remove_left 
-				; Going right.
-				lda temp8
-				sec
-				sbc levelPosition
-				cmp #0
-				beq @go_away_forever
-				cmp #18
-				bcs @go_away_forever
-				jmp @after_remove
-			@remove_left:
-				lda temp8
-				sec
-				sbc levelPosition
-				cmp #255 ; Because of some quirkiness in the engine, we can sometimes overshoot by 1. This is explicitly okay.
-				beq @your_ok
-				cmp #15
-				bcs @go_away_forever
-				@your_ok:
-				; jmp @after_remove ; Intentional fallthru
+			; Get levelPosition to be a 16-bit offset like the sprite offset is. This way, the top half is a screen id, and the bottom half is position within the screen.
+			; (Well, sorta... this lets us easily know if a sprite is more than 1 screen away)
+			lda #0
+			sta tempc
+			lda levelPosition
+			sta tempd
+			.repeat 4
+				asl tempd
+				rol tempc
+			.endrepeat
+			sec
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+			sbc tempd
+			sta tempe
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+			sbc tempc
+			sta tempf
 
-			@after_remove:
+			; Our scrolling logic makes this stuff behave pretty weird on the first panel of the map.
+			; So... heck with it, rather than do complex calculations to remove things on this screen, just... don't. 
+			; Once we get past the first screen everything will naturally fall off.
+			lda levelPosition
+			cmp #16
+			bcc @okay
+			cmp #255
+			beq @okay
+
+			; tempe is the low byte, tempf is the high... so, if the high byte is non-zero, you're useless to us. Go the heck away.
+			lda tempf
+			cmp #0
+			beq @okay 
+			cmp #1
+			beq @okay ; TODO: This and the one below it really depend on your direction. Should we consider direction
+			cmp #255
+			beq @okay
+			jmp @go_away_forever
+			@okay:
+
+
 
 			; After we've done removal, if you're something that doesn't move, go away.
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
@@ -2342,6 +2352,12 @@ do_sprite_movement:
 			beq @go_no_motion
 			cmp #SPRITE_TYPE_DIMENSIONER
 			beq @go_no_motion
+
+			; Don't bother calculating gravity if the sprite isn't visible.
+			lda VAR_SPRITE_DATA, x
+			cmp #SPRITE_OFFSCREEN
+			beq @go_no_motion
+
 
 			
 			lda VAR_SPRITE_DATA, x
