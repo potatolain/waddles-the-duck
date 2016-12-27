@@ -21,7 +21,7 @@
 ; $420-4ff: Static collectible data
 ; $500-55f: Screen buffer
 ; $560-5ff: Unused
-; $600-6ff: Map data
+; $600-6ff: Unused
 ; $700-7bf: Extended sprite data
 ; $7c0-7ff: Current level collectible data
 
@@ -62,6 +62,7 @@
 	tempAddr: 						.res 2
 	levelAddr: 						.res 2
 	nametableAddr:					.res 2
+	blockLookupAddr:				.res 2
 	scrollX:						.res 1
 	scrollY:						.res 1
 	ctrlButtons:					.res 1
@@ -104,6 +105,7 @@
 	isOnIce:						.res 1
 	pauseOption:					.res 1
 	hasStompedSprite:				.res 1
+	tempPosition:					.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -114,7 +116,6 @@
 	MAGICAL_BYTE					= $4ff
 	MAGICAL_BYTE_VALUE				= $db
 	GAME_BEATEN_BYTE				= $4fe
-	SCREEN_DATA						= $600
 	NEXT_ROW_CACHE					= $500
 	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
 	EXTENDED_SPRITE_DATA			= $700
@@ -589,7 +590,7 @@ load_nametable:
 		cpx #32
 		bne @loopdedo
 
-	; Load the first half second, so we seed SCREEN_DATA with the right stuff, rather than overwriting it. (255 so we get 0 because of overflows... likely could be written more clearly.)
+	; Load the first half second, so we draw the screen with the right stuff, rather than overwriting it. (255 so we get 0 because of overflows... likely could be written more clearly.)
 	ldx #255
 	stx levelPosition
 	
@@ -699,44 +700,33 @@ seed_level_position_r:
 
 	rts
 
-; "lightweight" version of the method below, to be used multiple times when the player changes direction 
-; in order to fill in the collision table adequately.
-load_current_line_light:
-	ldy levelPosition
+; Kind of an intense method... expects: tempe: coarse x, tempf: coarse y (Should be tile numbers, not full coords)
+; Looks up the exact tile id from lvlData&lvlDataAddr, and puts it in a.
+get_tile_at_position:
+	phxy
+
 
 	lda #0
-	sta tempAddr+1
+	ldy tempe
+	sta blockLookupAddr+1
 	lda (lvlRowDataAddr), y
 	.repeat 4
 		asl
-		rol tempAddr+1
+		rol blockLookupAddr+1
 	.endrepeat
 	clc
 	adc lvlDataAddr
-	sta tempAddr
-	lda tempAddr+1
+	sta blockLookupAddr
+	lda blockLookupAddr+1
 	adc lvlDataAddr+1
-	sta tempAddr+1
-	
-	ldy #0
-	lda levelPosition
-	and #%00001111
-	tax ; x is now the position to apply to screen. 0-15, loopinate.
-	
-	@loop:
-	
-		lda (tempAddr), y
-		sta SCREEN_DATA, x
-		iny
-		txa
-		clc
-		adc #16
-		tax
-		cpy #16
-		
-		bne @loop
-	rts
+	sta blockLookupAddr+1
 
+	ldy tempf
+	lda (blockLookupAddr), y
+
+
+	plxy
+	rts
 
 
 load_current_line:
@@ -769,13 +759,8 @@ load_current_line:
 	@loop:
 	
 		lda (tempAddr), y
-		sta SCREEN_DATA, x
 		jsr draw_to_cache
 		iny
-		txa
-		clc
-		adc #16
-		tax
 		cpy #16
 		
 		bne @loop
@@ -1211,49 +1196,37 @@ remove_existing_gems_and_boxes:
 
 		phy
 		jsr remove_sprite
-		; Build an address to update SCREEN_DATA
+		; Build an address to update our cache
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TEMP_Y, x
 		sec
 		sbc #HEADER_PIXEL_OFFSET
-		and #%11110000
-		sta tempb
+		sta tempf
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		sta tempe
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 		.repeat 4
 			lsr
+			ror tempe
 		.endrepeat
-		and #%00001111
-		ora tempb
-		sta tempb
-		tay
-		lda SCREEN_DATA, y
+		.repeat 4
+			lsr tempf
+		.endrepeat
+		jsr get_tile_at_position
+		and #%00111111
 		cmp #TILE_QUESTION_BLOCK
 		beq @found_it
 			; Didn't find it... okay, we might be one tile off on the y axis because the sprite moved. Reload and try again.
-			lda tempb
-			pha
-			and #%11110000
-			clc
-			adc #16
-			sta tempb
-			pla
-			and #%00001111
-			ora tempb
-			tay
-			lda SCREEN_DATA, y
+			inc tempf
+			jsr get_tile_at_position
+			and #%00111111
 			cmp #TILE_QUESTION_BLOCK
 			bne @do_nothing
 			; Else fallthrough
 
 		@found_it:
-		lda #TILE_QUESTION_BLOCK+1
-		sta SCREEN_DATA, y
 
-		; Lastly, update next_row_cache. Thankfully we stored the Y pos in tempa, so we can just shift it down to find an index...
-		lda tempb
-		.repeat 4
-			lsr
-		.endrepeat
-		tay
+		; Lastly, update next_row_cache. Thankfully we stored the Y pos in tempf, which is all we need for the cache
+		ldy tempf
 		lda #TILE_QUESTION_BLOCK+1
 		jsr draw_to_cache
 		@do_nothing:
@@ -1707,6 +1680,8 @@ test_vertical_collision:
 		lsr temp1
 		ror temp2
 	.endrepeat
+	lda temp2
+	sta tempe
 	; temp2 is now the x position of the block in test.
 	lda #%00001111 ; We only want the position % 16, so we can find our spot.
 	and temp2
@@ -1723,6 +1698,7 @@ test_vertical_collision:
 		adc playerYVelocity
 		sec
 		sbc #HEADER_PIXEL_OFFSET ; remove header
+		sta tempf
 
 		and #%11110000 ; Align with 16
 		cmp #%11000000 
@@ -1733,10 +1709,13 @@ test_vertical_collision:
 		; a is already multipied by 16, so we just need to combine it with temp2.
 		; Carry must be clear or we'd hit no collision, so skip clc
 		adc temp2
-		sta temp2 ; Temp2 is now our index off of the collision table to check.
-
+		sta temp2 ; Temp2 is now our index off of the current screen - used for question block lookups
 		tay
-		lda SCREEN_DATA, y
+
+		.repeat 4
+			lsr tempf
+		.endrepeat
+		jsr get_tile_at_position
 		and #%00111111
 		jsr do_collision_test
 		cmp #0
@@ -1751,18 +1730,21 @@ test_vertical_collision:
 		sbc #HEADER_PIXEL_OFFSET ; remove header
 		clc
 		adc playerYVelocity
+		sta tempf
 		and #%11110000 ; Align with 16
 		sta temp1
-		; TODO: Header check... and do, something?
 
 		; a is now the y coord of the block. temp2 is now the x.
 		; combine away.
 		clc
-		adc temp2
+		adc temp2 ; Temp2 is now our index off of the current screen - used for question block lookups
 		sta temp2
-
 		tay
-		lda SCREEN_DATA, y
+
+		.repeat 4
+			lsr tempf
+		.endrepeat
+		jsr get_tile_at_position
 		and #%00111111
 		jsr do_collision_test
 		cmp #0
@@ -1787,6 +1769,7 @@ test_horizontal_collision:
 	.endrepeat
 	lda temp2
 	sta temp1
+	sta tempe
 	lda #%00001111 ; We only want the position % 16 to find our x.
 	and temp2
 	sta temp2
@@ -1802,14 +1785,20 @@ test_horizontal_collision:
 		adc #7 ; bottom of sprite
 		sec
 		sbc #HEADER_PIXEL_OFFSET ; remove header
+		sta tempf
 		and #%11110000 ; Align with 16
 
 		clc
 		adc temp2
-		sta temp2
+		sta temp2 ; Temp2 is now our index off of the current screen - used for question block lookups
 
 		tay
-		lda SCREEN_DATA, y
+
+		.repeat 4
+			lsr tempf
+		.endrepeat
+		jsr get_tile_at_position
+
 		and #%00111111
 		jsr do_collision_test
 		cmp #0
@@ -1824,15 +1813,19 @@ test_horizontal_collision:
 		sbc #HEADER_PIXEL_OFFSET ; remove header
 		clc
 		adc #2 ; Little bit of buffer so that the player can fit under sprites, despite being 16 px tall.
+		sta tempf
 
 		and #%11110000 ; align with 16
 
 		clc
 		adc temp2
-		sta temp2
+		sta temp2 ; Temp2 is now our index off of the current screen - used for question block lookups
 		
-		tay 
-		lda SCREEN_DATA, y
+		tay
+		.repeat 4
+			lsr tempf
+		.endrepeat
+		jsr get_tile_at_position
 		and #%00111111
 		jsr do_collision_test
 		cmp #0
@@ -2285,7 +2278,7 @@ do_sprite_movement:
 	@go_away_forever:
 		jsr blow_away_current_sprite
 		jmp @remove
-	
+
 	@loop:
 		stx tempa
 		txa
@@ -2354,10 +2347,10 @@ do_sprite_movement:
 			beq @go_no_motion
 
 			; Don't bother calculating gravity if the sprite isn't visible.
+			; TODO: Axe this and similar code, and let offscreen sprites move around until they stop existing.
 			lda VAR_SPRITE_DATA, x
 			cmp #SPRITE_OFFSCREEN
 			beq @go_no_motion
-
 
 			
 			lda VAR_SPRITE_DATA, x
@@ -2368,8 +2361,8 @@ do_sprite_movement:
 			sbc #HEADER_PIXEL_OFFSET
 			clc
 			adc #PLAYER_VELOCITY_FALLING
+			sta tempf
 			and #%11110000
-			sta temp6
 			cmp #0
 			bne @not_dead
 				@go_remove:
@@ -2377,16 +2370,15 @@ do_sprite_movement:
 				jmp @remove
 			@not_dead:
 
-			lda temp8
-			and #%00001111
-			ora temp6
+			.repeat 4
+				lsr tempf
+			.endrepeat
 
-			sty temp7
-			tay 
-			lda SCREEN_DATA, y
+			lda temp8 ; Kind of weird... stems from poor variable usage. TODO: Make this less silly
+			sta tempe
+			jsr get_tile_at_position
 			and #%00111111
 			jsr do_collision_test
-			ldy temp7
 			cmp #0
 			bne @hit
 			
@@ -2394,24 +2386,17 @@ do_sprite_movement:
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
-			sta temp8
+			sta tempe
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 			adc #0
 			sta temp7
 			.repeat 4
 				lsr temp7
-				ror temp8
+				ror tempe
 			.endrepeat
-			lda temp8
-			and #%00001111
-			ora temp6
-
-			sty temp7
-			tay
-			lda SCREEN_DATA, y
+			jsr get_tile_at_position
 			and #%00111111
 			jsr do_collision_test
-			ldy temp7
 			cmp #0
 			bne @hit
 				; Okay, we tested both sides... you didn't hit. GOING DOWN.
@@ -2449,13 +2434,13 @@ do_sprite_movement:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 				sec
 				sbc #SPRITE_VELOCITY_NORMAL
-				sta temp8
+				sta tempe
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 				sbc #0
 				sta temp7
 				.repeat 4
 					lsr temp7
-					ror temp8
+					ror tempe
 				.endrepeat
 
 				
@@ -2464,19 +2449,16 @@ do_sprite_movement:
 				sbc #HEADER_PIXEL_OFFSET
 				sec
 				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
-				and #%11110000
-				sta temp6
+				sta tempf
+				
+				.repeat 4
+					lsr tempf
+				.endrepeat
 
-				lda temp8
-				and #%00001111
-				ora temp6
+				jsr get_tile_at_position
 
-				sty temp7
-				tay 
-				lda SCREEN_DATA, y
 				and #%00111111
 				jsr do_collision_test
-				ldy temp7
 				cmp #0
 				bne @hit_l
 				
@@ -2486,19 +2468,16 @@ do_sprite_movement:
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
 				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
-				and #%11110000
-				sta temp6
+				sta tempf
 
-				lda temp8 ; X Position doesn't change... just re-use it.
-				and #%00001111
-				ora temp6
+				.repeat 4
+					lsr tempf
+				.endrepeat
 
-				sty temp7
-				tay
-				lda SCREEN_DATA, y
+				jsr get_tile_at_position
+
 				and #%00111111
 				jsr do_collision_test
-				ldy temp7
 				cmp #0
 				bne @hit_l
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
@@ -2523,43 +2502,38 @@ do_sprite_movement:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 				clc
 				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x
-				sta temp8
+				sta tempe
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 				adc #0
 				sta temp7
-				lda temp8
+				lda tempe
 				clc
 				adc #SPRITE_VELOCITY_NORMAL
-				sta temp8
+				sta tempe
 				lda temp7
 				adc #0
 				sta temp7
 
 				.repeat 4
 					lsr temp7
-					ror temp8
+					ror tempe
 				.endrepeat
-				lda temp8
-				sta temp8
 
 				
 				lda VAR_SPRITE_DATA, x
 				sec
 				sbc #HEADER_PIXEL_OFFSET
 				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
-				and #%11110000
-				sta temp6
+				sta tempf
 
-				lda temp8
-				and #%00001111
-				ora temp6
+				.repeat 4
+					lsr tempf
+				.endrepeat
 
-				sty temp7
-				tay 
-				lda SCREEN_DATA, y
+				jsr get_tile_at_position
+
 				and #%00111111
 				jsr do_collision_test
-				ldy temp7
 				cmp #0
 				bne @hit_r
 				
@@ -2569,19 +2543,16 @@ do_sprite_movement:
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
 				adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
-				and #%11110000
-				sta temp6
+				sta tempf
 
-				lda temp8 ; X Position doesn't change... just re-use it.
-				and #%00001111
-				ora temp6
+				.repeat 4
+					lsr tempf
+				.endrepeat
 
-				sty temp7
-				tay
-				lda SCREEN_DATA, y
+				jsr get_tile_at_position
+
 				and #%00111111
 				jsr do_collision_test
-				ldy temp7
 				cmp #0
 				bne @hit_r
 					; Okay, we tested both sides... you didn't hit. MOVE OUT!
@@ -4297,23 +4268,6 @@ main_loop:
 	sta PPU_CTRL
 
 	jsr do_sprite0
-
-	; Reload the entire collision table every single frame. Yes, this is kind of a waste of CPU, but this is "The simplest thing I could possibly do" (tm)
-	; TODO: If we're hurting for cpu cycles, attempt to optimize this, or for a simpler fix, just do 1/2 every other cpu cycle, or 1/4 every 4th, etc
-	lda levelPosition
-	pha
-	jsr seed_level_position_l_current
-	lda playerIsInScrollMargin
-	cmp #0
-	beq @skip_load_current_line
-		.repeat 16
-			jsr load_current_line_light
-			inc levelPosition
-		.endrepeat
-	@skip_load_current_line: 
-	pla 
-	sta levelPosition
-
 
 
 	jmp main_loop
