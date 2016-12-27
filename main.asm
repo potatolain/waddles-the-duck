@@ -2264,7 +2264,6 @@ do_sprite_movement:
 	pha
 	jsr seed_level_position_l_current
 	lda levelPosition
-	sta watchme
 	sta tempAddr
 	lda #0
 	sta tempAddr+1
@@ -4282,7 +4281,7 @@ main_loop:
 		@do_draw:
 		jsr draw_current_nametable_row
 	@go_on:
-	
+
 	; If we're running out of cycles during vblank, this probably doesn't have to happen most of the time.
 
 	; Turn off 32 bit adding to do arbitrary graphical updates
@@ -4299,27 +4298,22 @@ main_loop:
 
 	jsr do_sprite0
 
-	lda playerDirection
-	cmp lastPlayerDirection
-	beq @no_dir_change
-		; Direction changed... our window to the world is a bit small, so we have to compensate by re-drawing a bunch of the collision table.
-		; TODO: If we have too many cycles and the framerate is suffering, there's likely a smarter way to do this.
-		cmp #PLAYER_DIRECTION_LEFT
-		bne @right_reload
-			; left
-			.repeat 8
-				inc levelPosition
-				jsr load_current_line_light
-			.endrepeat
-			jmp @no_dir_change
-		@right_reload: 
-			.repeat 8
-				dec levelPosition
-				jsr load_current_line_light
-			.endrepeat
-			; intentional fallthru to no_dir_change
+	; Reload the entire collision table every single frame. Yes, this is kind of a waste of CPU, but this is "The simplest thing I could possibly do" (tm)
+	; TODO: If we're hurting for cpu cycles, attempt to optimize this, or for a simpler fix, just do 1/2 every other cpu cycle, or 1/4 every 4th, etc
+	lda levelPosition
+	pha
+	jsr seed_level_position_l_current
+	lda playerIsInScrollMargin
+	cmp #0
+	beq @skip_load_current_line
+		.repeat 16
+			jsr load_current_line_light
+			inc levelPosition
+		.endrepeat
+	@skip_load_current_line: 
+	pla 
+	sta levelPosition
 
-	@no_dir_change:
 
 
 	jmp main_loop
