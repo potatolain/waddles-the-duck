@@ -2746,6 +2746,11 @@ test_sprite_collision:
 		cmp #0
 		beq @continue
 
+		; Hang on... this sprite is actually on *this* screen, right? If not, we should skip.
+		lda VAR_SPRITE_DATA, x
+		cmp #SPRITE_OFFSCREEN
+		beq @continue
+
 		jsr do_sprite_collision
 
 		@continue:
