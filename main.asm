@@ -107,6 +107,9 @@
 	pauseOption:					.res 1
 	hasStompedSprite:				.res 1
 	tempPosition:					.res 1
+	extendedSpriteDataX:			.res 1
+	varSpriteDataX:					.res 1
+	varSpriteDataOffset:			.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -166,7 +169,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Dimension definitions
 ;   Also masks for choosing which palettes to use.
-
+;   NOTE: Must not be %10100000, or SPRITE_ANIMATION_DYING needs a value this won't collide with 
 	DIMENSION_MASK				= %11100000
 	DIMENSION_PLAIN				= %00000000
 	DIMENSION_BARREN			= %00000010
@@ -309,6 +312,7 @@ SPRITE_DATA_HEIGHT					= 9
 SPRITE_DATA_SIZE					= 10
 SPRITE_DATA_ANIM_TYPE				= 11
 SPRITE_DATA_TYPE					= 12
+SPRITE_DATA_PALETTE					= 12 ; HACK: Shared with type 
 SPRITE_DATA_LEVEL_DATA_POSITION 	= 13
 SPRITE_DATA_SPEED					= 14
 SPRITE_DATA_EXTRA					= 15
@@ -317,6 +321,8 @@ SPRITE_DATA_DIRECTION_MASK 		= PLAYER_DIRECTION_MASK
 SPRITE_DATA_ANIM_STATE_MASK 	= %00001111
 SPRITE_DIRECTION_LEFT			= PLAYER_DIRECTION_LEFT
 SPRITE_DIRECTION_RIGHT 			= PLAYER_DIRECTION_RIGHT
+SPRITE_DATA_TYPE_MASK			= %00111111
+SPRITE_DATA_PALETTE_MASK		= %11000000
 
 SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks. (Could also use the put-behind-background bit, but, eh..)
 
@@ -886,6 +892,7 @@ load_current_line:
 				bne @not_covered
 					; Okay, if you were a gem we have a little more work for you...
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+					and #SPRITE_DATA_TYPE_MASK
 					cmp #SPRITE_TYPE_COLLECTIBLE
 					bne @not_gem
 						jsr remove_existing_gems_and_boxes
@@ -980,20 +987,7 @@ load_current_line:
 			sta temp7
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
-
-			; Palette
-			ldx temp6
-			lda sprite_definitions+6, x
-			sta temp7
-			
-			; We don't update attributes once they're set, so just set them directly now. 
-			ldx currentSprite
-			lda temp7
-			sta VAR_SPRITE_DATA+2, x
-			sta VAR_SPRITE_DATA+6, x
-			sta VAR_SPRITE_DATA+10, x
-			sta VAR_SPRITE_DATA+14, x
-			
+						
 			ldx currentSprite
 			lda temp3
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_LVL_INDEX, x
@@ -1029,7 +1023,12 @@ load_current_line:
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 
 			ldx temp6
-			lda sprite_definitions+0, x
+			lda sprite_definitions+6, x ; Get palette
+			ror
+			ror
+			ror
+			and #SPRITE_DATA_PALETTE_MASK
+			ora sprite_definitions+0, x ; Merge with type, so we can store both.
 			sta temp7
 			ldx currentSprite
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
@@ -2276,12 +2275,14 @@ do_sprite_movement:
 	ldx #0
 	; little hack to deal with the extreme length of this method. Nothing to see here, just start the loop...
 	jmp @loop
-	@go_no_motion: 
-		jmp @no_motion
 
 	@go_away_forever:
 		jsr blow_away_current_sprite
 		jmp @remove
+
+	@go_no_motion: 
+		jmp @no_motion
+
 
 	@loop:
 		stx tempa
@@ -2345,6 +2346,7 @@ do_sprite_movement:
 
 			; After we've done removal, if you're something that doesn't move, go away.
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+			and #SPRITE_DATA_TYPE_MASK
 			cmp #SPRITE_TYPE_COLLECTIBLE
 			beq @go_no_motion
 			cmp #SPRITE_TYPE_DIMENSIONER
@@ -2612,9 +2614,14 @@ do_sprite_movement:
 		@past_edge_case:
 
 
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+			cmp #SPRITE_TYPE_DIMENSIONER
+			beq @goto_after_anim
+
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
 			cmp #SPRITE_ANIMATION_NONE
 			bne @not_no_anim
+				@goto_after_anim:
 				lda #0
 				sta temp6
 				sta temp7
@@ -2687,10 +2694,13 @@ do_sprite_movement:
 				jmp @continue
 
 		@remove: 
+			phx
+			jsr get_var_sprite_data_offset
 			lda #SPRITE_OFFSCREEN
 			.repeat 4, I
 				sta VAR_SPRITE_DATA+(I*4), x
 			.endrepeat
+			plx
 			; fallthru to continue
 		@continue:
 		pla
@@ -2713,27 +2723,48 @@ test_sprite_collision:
 	adc #PLAYER_HEIGHT
 	sta temp1 ; player y2
 
-	lda PLAYER_SPRITE+3
+	lda playerPosition
 	clc
 	adc #PLAYER_WIDTH
 	sta temp2 ; player x2
+	lda playerPosition+1
+	adc #0
+	sta tempe
 
 	ldx #0
 	@loop:
+
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
 		cmp #SPRITE_ANIMATION_DYING
 		beq @continue ; No collisions for the dying...
 
 		; Logic derived from some code posted by Celius, here: http://forums.nesdev.com/viewtopic.php?t=3743
-		lda VAR_SPRITE_DATA+3, x ; enemyLeftEdge
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		cmp tempe
+		bcc @safe_1
+		bne @continue
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x ; enemyLeftEdge
 		cmp temp2 ; playerRightEdge
 		bcs @continue
 
-		lda VAR_SPRITE_DATA+3, x 
+		@safe_1:
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 		clc
 		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_WIDTH, x ; enemyRightEdge
-		cmp PLAYER_SPRITE+3 ; playerLeftEdge
+		sta tempf
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		adc #0
+		cmp playerPosition+1
 		bcc @continue
+		bne @safe_2
+		lda tempf
+		cmp playerPosition ; playerLeftEdge
+		bcc @continue
+
+		@safe_2:
 
 		jsr get_current_sprite_y ; enemyTopEdge
 		cmp temp1 ; playerBottomEdge
@@ -2748,11 +2779,6 @@ test_sprite_collision:
 		; Is this sprite dead? Don't do things with dead sprites. It's just wrong.
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 		cmp #0
-		beq @continue
-
-		; Hang on... this sprite is actually on *this* screen, right? If not, we should skip.
-		lda VAR_SPRITE_DATA, x
-		cmp #SPRITE_OFFSCREEN
 		beq @continue
 
 		jsr do_sprite_collision
@@ -2795,6 +2821,8 @@ test_sprite_collision:
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_2x1_sprite_size: 
+	phy
+	jsr get_var_sprite_data_offset_y
 	
 	lda temp1
 	sec
@@ -2802,16 +2830,17 @@ draw_2x1_sprite_size:
 	cmp #SPRITE_X_CUTOFF
 	bcc @dont_kill_the_sprite
 		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
 		rts
 	@dont_kill_the_sprite:
-	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+3, y
 	clc
 	adc #8
-	sta VAR_SPRITE_DATA+7, x
+	sta VAR_SPRITE_DATA+7, y
 
 	
 	lda temp6
@@ -2827,39 +2856,53 @@ draw_2x1_sprite_size:
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	clc
 	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
-	sta VAR_SPRITE_DATA, x
-	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA, y
+	sta VAR_SPRITE_DATA+4, y
 
 	lda #SPRITE_OFFSCREEN
-	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x
+	sta VAR_SPRITE_DATA+8, y
+	sta VAR_SPRITE_DATA+12, y
 	
-	; Attrs for sprites set on spawn, then left alone.
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	clc
 	adc temp6
-	sta VAR_SPRITE_DATA+1, x
+	sta VAR_SPRITE_DATA+1, y
 	clc
 	adc #1
-	sta VAR_SPRITE_DATA+5, x
+	sta VAR_SPRITE_DATA+5, y
 
+	ply
 	rts
 	
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_tiny_sprite_size: 
+	phy
+	jsr get_var_sprite_data_offset_y
+
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
 	cmp #SPRITE_DATA_EXTRA_IS_HIDDEN
 	bne @not_hidden
 		; Oh, you're hidden? Okay we can deal with you.
 		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
 		rts
 	@not_hidden:
-
+	
 	; Without a doubt, this is imperfect. It hides sprites that would wrap and show on the right of the screen instead of disappearing.
 	; TODO: Figure out what's wrong with the math here, and make sprites appear at the same time terrain does.
 	lda temp1
@@ -2870,13 +2913,14 @@ draw_tiny_sprite_size:
 	cmp #SPRITE_X_CUTOFF
 	bcc @dont_kill_the_sprite
 		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
 		rts
 	@dont_kill_the_sprite:
-	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+3, y
 
 
 	lda temp6
@@ -2892,24 +2936,37 @@ draw_tiny_sprite_size:
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	clc
 	adc #4 ; You're half height; get on the floor; everybody do the dinosaur
-	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA, y
 
 	lda #SPRITE_OFFSCREEN
-	sta VAR_SPRITE_DATA+4, x
-	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x	
+	sta VAR_SPRITE_DATA+4, y
+	sta VAR_SPRITE_DATA+8, y
+	sta VAR_SPRITE_DATA+12, y	
 
-	; Attrs for sprites set on spawn, then left alone.
-
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
+	
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	clc
 	adc temp6
-	sta VAR_SPRITE_DATA+1, x
+	sta VAR_SPRITE_DATA+1, y
 
+	ply
 	rts
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_tiny_aligned_sprite_size: 
+	phy
+	jsr get_var_sprite_data_offset_y
+
 	lda temp6
 	.repeat 4
 		asl
@@ -2921,30 +2978,43 @@ draw_tiny_aligned_sprite_size:
 	adc temp6
 	sta temp6
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
-	sta VAR_SPRITE_DATA, x
+	sta VAR_SPRITE_DATA, y
 
 	lda #SPRITE_OFFSCREEN
-	sta VAR_SPRITE_DATA+4, x
-	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x
+	sta VAR_SPRITE_DATA+4, y
+	sta VAR_SPRITE_DATA+8, y
+	sta VAR_SPRITE_DATA+12, y
 	
 	lda temp1
 	sec
 	sbc temp2
-	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+3, y
 
-	; Attrs for sprites set on spawn, then left alone.
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	clc
 	adc temp6
-	sta VAR_SPRITE_DATA+1, x
+	sta VAR_SPRITE_DATA+1, y
 
+	ply
 	rts
 
 
 ; x must be a sprite id, temp6 is animation, temp7 is direction
 draw_3x1_sprite_size: 
+	phy
+	jsr get_var_sprite_data_offset_y
+
 	
 	lda temp1
 	sec
@@ -2952,19 +3022,20 @@ draw_3x1_sprite_size:
 	cmp #SPRITE_X_CUTOFF
 	bcc @dont_kill_the_sprite
 		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
 		rts
 	@dont_kill_the_sprite:
-	sta VAR_SPRITE_DATA+3, x
+	sta VAR_SPRITE_DATA+3, y
 	clc
 	adc #8
-	sta VAR_SPRITE_DATA+7, x
+	sta VAR_SPRITE_DATA+7, y
 	clc
 	adc #8
-	sta VAR_SPRITE_DATA+11, x
+	sta VAR_SPRITE_DATA+11, y
 
 	
 	lda temp6
@@ -2982,42 +3053,44 @@ draw_3x1_sprite_size:
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	clc
 	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
-	sta VAR_SPRITE_DATA, x
-	sta VAR_SPRITE_DATA+4, x
-	sta VAR_SPRITE_DATA+8, x
+	sta VAR_SPRITE_DATA, y
+	sta VAR_SPRITE_DATA+4, y
+	sta VAR_SPRITE_DATA+8, y
 
 	lda #SPRITE_OFFSCREEN
-	sta VAR_SPRITE_DATA+12, x
+	sta VAR_SPRITE_DATA+12, y
 	
-	; Attrs for sprites set on spawn, then left alone.
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	clc
 	adc temp6
-	sta VAR_SPRITE_DATA+1, x
+	sta VAR_SPRITE_DATA+1, y
 	clc
 	adc #1
-	sta VAR_SPRITE_DATA+5, x
+	sta VAR_SPRITE_DATA+5, y
 	clc
 	adc #1
-	sta VAR_SPRITE_DATA+9, x
+	sta VAR_SPRITE_DATA+9, y
 
-	rts
-
-; Due to some poor decisions in design, the stored Y for sprites isn't actually their real position; it is their position if they were 16px tall.
-; Unfortunately, refactoring to fix this would take time I don't have before the end of the contest, so... going to just make this as clear as I can.
-; Given a sprite index in x, places the y position of the sprite into a.
-get_current_sprite_y:
-	lda #16
-	sec
-	sbc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
-	clc
-	adc EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	ply
 	rts
 
 
 
 draw_default_sprite_size:
+	phy
+	jsr get_var_sprite_data_offset_y
+
 
 	lda temp1
 	sec
@@ -3026,19 +3099,20 @@ draw_default_sprite_size:
 	cmp #SPRITE_X_CUTOFF
 	bcc @dont_kill_the_sprite
 		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-		sta VAR_SPRITE_DATA+8, x
-		sta VAR_SPRITE_DATA+12, x
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
 		rts
 	@dont_kill_the_sprite:
 
-	sta VAR_SPRITE_DATA+3, x
-	sta VAR_SPRITE_DATA+11, x
+	sta VAR_SPRITE_DATA+3, y
+	sta VAR_SPRITE_DATA+11, y
 	clc
 	adc #8
-	sta VAR_SPRITE_DATA+7, x
-	sta VAR_SPRITE_DATA+15, x
+	sta VAR_SPRITE_DATA+7, y
+	sta VAR_SPRITE_DATA+15, y
 
 
 	lda temp6
@@ -3053,29 +3127,112 @@ draw_default_sprite_size:
 	sta temp6
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
-	sta VAR_SPRITE_DATA, x
-	sta VAR_SPRITE_DATA+4, x
+	sta VAR_SPRITE_DATA, y
+	sta VAR_SPRITE_DATA+4, y
 	clc
 	adc #8
-	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x
+	sta VAR_SPRITE_DATA+8, y
+	sta VAR_SPRITE_DATA+12, y
 
-	; Attrs for sprites set on spawn, then left alone.
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 	clc
 	adc temp6
-	sta VAR_SPRITE_DATA+1, x
+	sta VAR_SPRITE_DATA+1, y
 	clc
 	adc #1
-	sta VAR_SPRITE_DATA+5, x
+	sta VAR_SPRITE_DATA+5, y
 	clc
 	adc #$f
-	sta VAR_SPRITE_DATA+9, x
+	sta VAR_SPRITE_DATA+9, y
 	adc #1
-	sta VAR_SPRITE_DATA+13, x
+	sta VAR_SPRITE_DATA+13, y
+
+	ply
+	rts
+
+; Due to some poor decisions in design, the stored Y for sprites isn't actually their real position; it is their position if they were 16px tall.
+; Unfortunately, refactoring to fix this would take time I don't have before the end of the contest, so... going to just make this as clear as I can.
+; Given a sprite index in x, places the y position of the sprite into a.
+get_current_sprite_y:
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_SIZE, x
+	cmp #SPRITE_SIZE_DEFAULT
+	beq @default
+	cmp #SPRITE_SIZE_2X1
+	beq @half
+	cmp #SPRITE_SIZE_3X1
+	beq @half
+	cmp #SPRITE_SIZE_TINY
+	beq @quarter
+	cmp #SPRITE_SIZE_TINY_NORMAL_ALIGNMENT
+	beq @quarter
+	jmp @default
+
+
+	@default: 
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		rts
+
+	@half:
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		clc
+		adc #8
+		rts
+	
+	@quarter: 
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		clc
+		adc #4
+		rts
+	
+
+; Similar explanation... there are a few things that really work best using collisions between on-screen sprites. But, we want rotating sprites to 
+; allow flickering when > 8 sprites on a line. So... try to avoid doing it, but if you have to, use this.
+; Will seed x with the value of the offset to VAR_SPRITE_DATA to use. Note: this obviously destroys x, so put it somewhere first.
+get_var_sprite_data_offset:
+	lda varSpriteDataOffset
+	and #%00000001
+	cmp #0
+	beq @do_nothing
+		stx macroTmp
+		lda #$b0
+		sec
+		sbc macroTmp
+
+		tax
+		rts
+	@do_nothing:
 
 	rts
+
+; Same as above, but this puts it into y
+get_var_sprite_data_offset_y:
+	lda varSpriteDataOffset
+	and #%00000001
+	cmp #0
+	beq @do_nothing
+		stx macroTmp
+		lda #$b0
+		sec
+		sbc macroTmp
+
+		tay
+		rts
+	@do_nothing:
+	txa
+	tay
+	rts
+
 
 ; You hit. What're we gonna do to you?
 do_sprite_collision: 
@@ -3118,7 +3275,7 @@ do_sprite_collision:
 		clc
 		adc #PLAYER_HEIGHT
 		sta temp6
-		lda VAR_SPRITE_DATA, x
+		jsr get_current_sprite_y
 		cmp temp6
 		bcs @above
 			jmp do_player_death						
@@ -3137,8 +3294,8 @@ do_sprite_collision:
 	bne @not_dimensioner
 		; This thing transports us between dimensions... mark it up.
 		store #1, isInWarpZone
-		; Little bit of funky, dirty code here. We store dimension A in the palette id, and b in the speed. 
-		lda VAR_SPRITE_DATA+2, x
+		; Little bit of funky, dirty code here. We store dimension A in the anim type, and b in the speed. 
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ANIM_TYPE, x
 		sta warpDimensionA
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 		sta warpDimensionB
@@ -3291,44 +3448,6 @@ squish_sprite:
 	lda #SPRITE_DYING
 	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
 
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
-	.repeat 3
-		asl
-	.endrepeat
-	tay
-	lda sprite_definitions+3, y
-	cmp #SPRITE_SIZE_DEFAULT
-	bne @not_default
-		lda #SPRITE_OFFSCREEN
-		sta VAR_SPRITE_DATA, x
-		sta VAR_SPRITE_DATA+4, x
-
-		lda #SPRITE_DYING
-		sta VAR_SPRITE_DATA+9, x
-		lda #SPRITE_DYING+1
-		sta VAR_SPRITE_DATA+13, x
-		jmp @after_tests
-	@not_default:
-	cmp #SPRITE_SIZE_2X1
-	bne @not_2x1
-		lda #SPRITE_DYING
-		sta VAR_SPRITE_DATA+1, x
-		lda #SPRITE_DYING+1
-		sta VAR_SPRITE_DATA+5, x
-		jmp @after_tests
-	@not_2x1:
-	cmp #SPRITE_SIZE_3X1
-	bne @not_3x1
-		lda #SPRITE_DYING
-		sta VAR_SPRITE_DATA+1
-		sta VAR_SPRITE_DATA+9
-		lda #SPRITE_DYING+1
-		sta VAR_SPRITE_DATA+5
-		; jmp @after_tests
-	@not_3x1: 
-
-	@after_tests:
-
 	txa
 	pha
 	lda #SFX_SQUISH
@@ -3357,11 +3476,6 @@ remove_sprite:
 	lda #0
 	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	
-	; We may not re-run sprite drawing immediately, so get those outta here now.
-	sta VAR_SPRITE_DATA, x
-	sta VAR_SPRITE_DATA+4, x
-	sta VAR_SPRITE_DATA+8, x
-	sta VAR_SPRITE_DATA+12, x
 
 	; Also update level data...
 	jsr get_gem_update_data
@@ -4288,6 +4402,8 @@ do_dimensional_transfer:
 	rts
 	
 main_loop: 
+	lda frameCounter
+	sta varSpriteDataOffset
 
 	jsr handle_main_input
 	lda #0
@@ -4334,6 +4450,13 @@ main_loop:
 	sta PPU_CTRL
 
 	; Alternate between updating the hud and animating tiles on even/odd cycles
+	lda arbitraryTileUpdatePos
+	cmp #0
+	beq @no_arbitrary_tile
+		jsr update_arbitrary_tile
+		jmp @after_switchables
+	@no_arbitrary_tile:
+
 	lda frameCounter
 	and #%00000001
 	cmp #0
@@ -4343,7 +4466,6 @@ main_loop:
 	@do_animation:
 		jsr animate_tiles
 	@after_switchables: 
-	jsr update_arbitrary_tile
 
 	; Turn 32 bit adding back on.
 	lda ppuCtrlBuffer
@@ -4383,43 +4505,39 @@ update_buffer_for_warp_zone:
 		rts
 
 update_arbitrary_tile:
-	lda arbitraryTileUpdatePos
-	cmp #0
-	beq @no_update
 
-		lda PPU_STATUS
-		store arbitraryTileAddr+1, PPU_ADDR
-		store arbitraryTileAddr, PPU_ADDR
-		lda arbitraryTileUpdateId
-		sta PPU_DATA
-		clc
-		adc #1
-		sta PPU_DATA
+	lda PPU_STATUS
+	store arbitraryTileAddr+1, PPU_ADDR
+	store arbitraryTileAddr, PPU_ADDR
+	lda arbitraryTileUpdateId
+	sta PPU_DATA
+	clc
+	adc #1
+	sta PPU_DATA
 
-		; Now jump two lines and do it again.
-		lda PPU_STATUS
-		lda arbitraryTileAddr
-		clc
-		adc #$20
-		sta arbitraryTileAddr
-		lda arbitraryTileAddr+1
-		adc #0
-		sta arbitraryTileAddr+1
-		sta PPU_ADDR
-		store arbitraryTileAddr, PPU_ADDR
+	; Now jump two lines and do it again.
+	lda PPU_STATUS
+	lda arbitraryTileAddr
+	clc
+	adc #$20
+	sta arbitraryTileAddr
+	lda arbitraryTileAddr+1
+	adc #0
+	sta arbitraryTileAddr+1
+	sta PPU_ADDR
+	store arbitraryTileAddr, PPU_ADDR
 
-		lda arbitraryTileUpdateId
-		clc
-		adc #$10
-		sta PPU_DATA
-		adc #1
-		sta PPU_DATA
+	lda arbitraryTileUpdateId
+	clc
+	adc #$10
+	sta PPU_DATA
+	adc #1
+	sta PPU_DATA
 
 
-		lda #0
-		sta arbitraryTileUpdatePos
+	lda #0
+	sta arbitraryTileUpdatePos
 
-	@no_update:
 	rts
 
 animate_tiles: 
@@ -4808,7 +4926,7 @@ nmi:
     tya
     pha
 	
-	; Reminder: NO shared variables here. If you share them, make damn sure you save them before, and pop em after!
+	; Reminder: NO shared variables here. If you share them, make sure you save them before, and pop em after!
 	inc frameCounter
 	lda	#$00		; set the low byte (00) of the RAM address
 	sta	OAM_ADDR

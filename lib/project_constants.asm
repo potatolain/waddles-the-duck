@@ -1,4 +1,4 @@
-.define  		BUILD 			4372  
+.define  		BUILD 			4482  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Tue 12/27/2016 22:27" 
-.define 		SPLASH_MESSAGE 	"Goldfish easter egg! " 
+.define 		BUILD_DATE		"Wed 12/28/2016 13:40" 
+.define 		SPLASH_MESSAGE 	"Now includes free pants! " 
