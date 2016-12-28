@@ -183,7 +183,7 @@
 	TILE_ROW_PLAIN				= $6
 	TILE_ROW_BARREN				= $a
 	TILE_ROW_ICE_AGE			= $8
-	TILE_ROW_AGGRESSIVE			= $a
+	TILE_ROW_AGGRESSIVE			= $4
 	TILE_ROW_AUTUMN				= $a
 	TILE_ROW_END_OF_DAYS		= $a
 
@@ -1517,6 +1517,20 @@ do_special_tile_stuff:
 		; Intentional fallthrough
 
 	@not_question_block:
+	lda tempCollisionTile
+	cmp #TILE_WATER
+	beq @water
+	cmp #TILE_WATER_BENEATH
+	beq @water
+	rts
+
+	@water:
+		lda currentDimension
+		cmp #DIMENSION_AGGRESSIVE
+		bne @done_water
+		; Welp, time to die.
+		jmp do_player_death
+	@done_water:
 	rts
 
 reset_collision_state:
@@ -1615,8 +1629,11 @@ do_collision_test:
  	@fire:
 		; We're in the fire dimension. Special rules apply.
 		lda tempCollision
+
 		cmp #TILE_WATER
-		beq @no_collision
+		beq @special_tile_collision
+		cmp #TILE_WATER_BENEATH
+		beq @special_tile_collision
 		cmp #TILE_PLANT
 		beq @no_collision
 		cmp #TILE_ICE_BLOCK
@@ -4199,18 +4216,23 @@ get_row_from_a:
 	cmp #DIMENSION_PLAIN
 	beq @plain
 	cmp #DIMENSION_BARREN
-	beq @aggressive
+	beq @barren
 	cmp #DIMENSION_ICE_AGE
 	beq @ice_age
-	; Fallthru... just use a default to save some instructions.
-	; cmp #DIMENSION_AGGRESSIVE
-	; beq @aggressive
-	; cmp #DIMENSION_AUTUMN
-	; beq @aggressive
-	; cmp #DIMENSION_END_OF_DAYS
-	; beq @aggressive
+	cmp #DIMENSION_AGGRESSIVE
+	beq @aggressive
+	cmp #DIMENSION_END_OF_DAYS
+	beq @end_of_days
 	@aggressive:
 	 	lda #TILE_ROW_AGGRESSIVE
+		rts
+
+	@barren: 
+		lda #TILE_ROW_BARREN
+		rts
+
+	@end_of_days:
+		lda #TILE_ROW_END_OF_DAYS
 		rts
 
 	@plain: 
