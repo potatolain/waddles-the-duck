@@ -887,7 +887,13 @@ load_current_line:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
 				sta macroTmp ; TODO: This is... bad form. Plain and simple. Need it to compare y, below.
 				cmp #0
-				beq @not_covered_and_empty ; Kind of a hack... your first sprite may get dupes, but this way we don't have to throw a bogus value in to start.
+				bne @must_test
+					; okay, so either you're sprite 0 in the level, or you're gone. If you're sprite zero, you should still have a non-zero y coordinate.
+					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+					cmp #0 
+					beq @not_covered_and_empty
+				
+				@must_test: 
 				cpy macroTmp
 				bne @not_covered
 					; Okay, if you were a gem we have a little more work for you...
