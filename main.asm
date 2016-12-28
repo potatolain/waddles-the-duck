@@ -20,7 +20,8 @@
 ; $400-41f: Unused
 ; $420-4ff: Static collectible data
 ; $500-55f: Screen buffer
-; $560-5ff: Unused
+; $560-5c0: Animated tile buffer
+; $5c0-5ff: Unused
 ; $600-6ff: Unused
 ; $700-7bf: Extended sprite data
 ; $7c0-7ff: Current level collectible data
@@ -118,6 +119,7 @@
 	GAME_BEATEN_BYTE				= $4fe
 	NEXT_ROW_CACHE					= $500
 	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
+	ANIMATED_TILE_CACHE				= $560
 	EXTENDED_SPRITE_DATA			= $700
 	LEFT_ATTR_MASK					= %00110011
 	RIGHT_ATTR_MASK					= %11001100
@@ -218,6 +220,8 @@
 	TILE_CLOUD				= 28
 
 	TILE_LEVEL_END			= 49
+
+	WATER_TILE_LOCATION		= $0600
 
 	GAME_TILE_A				= $e6
 	GAME_TILE_0				= $dc
@@ -4077,6 +4081,59 @@ draw_switchable_tiles:
 		dec temp2
 		cpy temp2 ; Since y is definitely 0, and that's what we wanna count down to.
 		beq @loop_tiles
+
+	; Okay, almost done... now we need to separate out the animated tiles, and draw those into the next row.
+	; These will then get copied into their places every cycle (well, realistically more like  1x every 4 or so)
+	phx
+
+	ldy #0
+	ldx #0
+	dec tempAddr+1
+	dec tempAddr+1 ; Put us back where we started last time.
+	@loop_animated_tiles_1: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #32
+		bne @loop_animated_tiles_1
+	
+	ldy #192
+	@loop_animated_tiles_2: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #224
+		bne @loop_animated_tiles_2
+
+
+	; Now get the bottom tiles.
+	ldy #0
+	inc tempAddr+1 ; Next row please.
+	@loop_animated_tiles_3: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #32
+		bne @loop_animated_tiles_3
+	
+	ldy #192
+	@loop_animated_tiles_4: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #224
+		bne @loop_animated_tiles_4
+
+
+	plx
 	rts
 
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
@@ -4276,7 +4333,16 @@ main_loop:
 	and #%00001000
 	sta PPU_CTRL
 
-	jsr update_hud_gem_count
+	; Alternate between updating the hud and animating tiles on even/odd cycles
+	lda frameCounter
+	and #%00000001
+	cmp #0
+	beq @do_animation
+		jsr update_hud_gem_count
+		jmp @after_switchables
+	@do_animation:
+		jsr animate_tiles
+	@after_switchables: 
 	jsr update_arbitrary_tile
 
 	; Turn 32 bit adding back on.
@@ -4354,6 +4420,25 @@ update_arbitrary_tile:
 		sta arbitraryTileUpdatePos
 
 	@no_update:
+	rts
+
+animate_tiles: 
+	lda frameCounter
+	and #%00010000
+	asl ; Get the var we got from frameCounter to be either 32 or 0, allowing us to select data from one of our two tiles.
+	tax
+
+	set_ppu_addr WATER_TILE_LOCATION
+	.repeat 32, I
+		lda ANIMATED_TILE_CACHE+I, x
+		sta PPU_DATA
+	.endrepeat
+
+	set_ppu_addr WATER_TILE_LOCATION+$100 ; second tile row
+	.repeat 32, I
+		lda ANIMATED_TILE_CACHE+64+I, x
+		sta PPU_DATA
+	.endrepeat
 	rts
 
 clear_sprites:
