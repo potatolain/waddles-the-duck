@@ -159,7 +159,7 @@
 	HEADER_PIXEL_OFFSET			= 48
 	SPRITE_HEIGHT_OFFSET		= 8
 	SPRITE_VELOCITY_NORMAL		= 1 ; This trips every other frame, so multiply accordinly.
-	SPRITE_X_CUTOFF 			= 244
+	SPRITE_X_CUTOFF 			= 240
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
@@ -2709,6 +2709,7 @@ do_sprite_movement:
 			plx
 			; fallthru to continue
 		@continue:
+		jsr remove_offscreened_sprites
 		pla
 		tax
 		inx
@@ -2719,6 +2720,60 @@ do_sprite_movement:
 	@done:
 	pla
 	sta levelPosition
+	rts
+
+; Little bit of context... sprites are hard, and our logic is... pretty complicated. 
+; In an ideal world this wouldn't exist, and when we put individual sprites into VAR_SPRITE_DATA, we'd check if they are offscreen,
+; then if this part of the metasprite is off-screen don't copy it.
+; Reality is, this logic would take a very long time to untangle, and likely break a few things on the way. With a deadline approaching, doing
+; that work doesn't make much sense. SO...
+;
+; This method takes the top-left sprite in your metasprite (4 tiles) and makes sure all other pieces are within 64px of it. If not, it is assumed to be on the wrong 
+; screen and removed. 
+remove_offscreened_sprites:
+	lda VAR_SPRITE_DATA, x
+	cmp #SPRITE_OFFSCREEN
+	bne @no_escape
+		rts
+	@no_escape:
+	lda VAR_SPRITE_DATA+12, x
+	cmp #SPRITE_OFFSCREEN
+	beq @no_4th
+		lda VAR_SPRITE_DATA+15, x
+		sec
+		sbc VAR_SPRITE_DATA+3,x 
+		cmp #64
+		bcc @no_action_4
+			lda #SPRITE_OFFSCREEN
+			sta VAR_SPRITE_DATA+12, x
+		@no_action_4:
+	@no_4th:
+
+	lda VAR_SPRITE_DATA+8, x
+	cmp #SPRITE_OFFSCREEN
+	beq @no_3rd
+		lda VAR_SPRITE_DATA+11, x
+		sec
+		sbc VAR_SPRITE_DATA+3,x 
+		cmp #64
+		bcc @no_action_3
+			lda #SPRITE_OFFSCREEN
+			sta VAR_SPRITE_DATA+8, x
+		@no_action_3:
+	@no_3rd:
+
+	lda VAR_SPRITE_DATA+4, x
+	cmp #SPRITE_OFFSCREEN
+	beq @no_2nd
+		lda VAR_SPRITE_DATA+7, x
+		sec
+		sbc VAR_SPRITE_DATA+3,x 
+		cmp #64
+		bcc @no_action_2
+			lda #SPRITE_OFFSCREEN
+			sta VAR_SPRITE_DATA+4, x
+		@no_action_2:
+	@no_2nd:
 	rts
 
 test_sprite_collision:
