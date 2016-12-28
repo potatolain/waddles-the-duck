@@ -2347,13 +2347,12 @@ do_sprite_movement:
 			beq @go_no_motion
 
 			; Don't bother calculating gravity if the sprite isn't visible.
-			; TODO: Axe this and similar code, and let offscreen sprites move around until they stop existing.
-			lda VAR_SPRITE_DATA, x
-			cmp #SPRITE_OFFSCREEN
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+			cmp #0
 			beq @go_no_motion
 
 			
-			lda VAR_SPRITE_DATA, x
+			jsr get_current_sprite_y
 			clc
 			adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
 			bcs @go_remove
@@ -2444,7 +2443,7 @@ do_sprite_movement:
 				.endrepeat
 
 				
-				lda VAR_SPRITE_DATA, x
+				jsr get_current_sprite_y
 				sec
 				sbc #HEADER_PIXEL_OFFSET
 				sec
@@ -2463,7 +2462,7 @@ do_sprite_movement:
 				bne @hit_l
 				
 				; Recalculate for sprite bottom
-				lda VAR_SPRITE_DATA, x
+				jsr get_current_sprite_y
 				sec
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
@@ -2520,7 +2519,7 @@ do_sprite_movement:
 				.endrepeat
 
 				
-				lda VAR_SPRITE_DATA, x
+				jsr get_current_sprite_y
 				sec
 				sbc #HEADER_PIXEL_OFFSET
 				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
@@ -2538,7 +2537,7 @@ do_sprite_movement:
 				bne @hit_r
 				
 				; Recalculate for sprite bottom
-				lda VAR_SPRITE_DATA, x
+				jsr get_current_sprite_y
 				sec
 				sbc #HEADER_PIXEL_OFFSET+2 ; Little extra buffer to make sure we stay on the same tile. Don't want us stuck in the ground!
 				clc
@@ -2732,11 +2731,11 @@ test_sprite_collision:
 		cmp PLAYER_SPRITE+3 ; playerLeftEdge
 		bcc @continue
 
-		lda VAR_SPRITE_DATA, x ; enemyTopEdge
+		jsr get_current_sprite_y ; enemyTopEdge
 		cmp temp1 ; playerBottomEdge
 		bcs @continue
 
-		lda VAR_SPRITE_DATA, x
+		jsr get_current_sprite_y
 		clc
 		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x ; enemyBottomEdge
 		cmp PLAYER_SPRITE ; playerTopEdge
@@ -2995,6 +2994,18 @@ draw_3x1_sprite_size:
 	sta VAR_SPRITE_DATA+9, x
 
 	rts
+
+; Due to some poor decisions in design, the stored Y for sprites isn't actually their real position; it is their position if they were 16px tall.
+; Unfortunately, refactoring to fix this would take time I don't have before the end of the contest, so... going to just make this as clear as I can.
+; Given a sprite index in x, places the y position of the sprite into a.
+get_current_sprite_y:
+	lda #16
+	sec
+	sbc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x
+	clc
+	adc EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	rts
+
 
 
 draw_default_sprite_size:
