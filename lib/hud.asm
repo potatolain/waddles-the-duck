@@ -12,7 +12,7 @@ show_hud:
 		sta PPU_DATA
 	.endrepeat
 	store #TILE_BORDER_TR, PPU_DATA
-	.repeat 3
+	.repeat 1
 		store #TILE_BORDER_L, PPU_DATA
 		lda #TILE_HUD_BLANK
 		.repeat $1e
@@ -32,7 +32,7 @@ show_hud:
 
 update_hud_gem_count: 
 
-	set_ppu_addr $2094
+	set_ppu_addr $2041
 	lda #GAME_TILE_A+6 ; G
 	sta PPU_DATA
 	lda #GAME_TILE_A+4 ; E
