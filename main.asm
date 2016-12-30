@@ -1528,6 +1528,8 @@ do_special_tile_stuff:
 	beq @water
 	cmp #TILE_WATER_BENEATH
 	beq @water
+	cmp #TILE_ICE_BLOCK ; Ice = fire. Icey fwoots!
+	beq @fire
 	rts
 
 	@water:
@@ -1537,6 +1539,14 @@ do_special_tile_stuff:
 		; Welp, time to die.
 		jmp do_player_death
 	@done_water:
+
+	@fire:
+		lda currentDimension
+		cmp #DIMENSION_AGGRESSIVE
+		bne @done_fire
+		; Again, you die here
+		jmp do_player_death
+	@done_fire:
 	rts
 
 reset_collision_state:
@@ -1631,6 +1641,20 @@ do_collision_test:
 		beq @no_collision
 		jmp @collision
 
+	@special_tile_collision:
+		store tempCollision, tempCollisionTile
+		sty tempCollisionTilePos
+
+			lda #1
+		rts
+
+	@special_tile_no_collision:
+		sty tempCollisionTilePos
+
+			store tempCollision, tempCollisionTile
+		lda #0
+		rts
+
 
  	@fire:
 		; We're in the fire dimension. Special rules apply.
@@ -1639,6 +1663,8 @@ do_collision_test:
 		cmp #TILE_WATER
 		beq @special_tile_collision
 		cmp #TILE_WATER_BENEATH
+		beq @special_tile_collision
+		cmp #TILE_ICE_BLOCK
 		beq @special_tile_collision
 		cmp #TILE_PLANT
 		beq @no_collision
@@ -1681,21 +1707,6 @@ do_collision_test:
 		cmp #TILE_PLANT
 		beq @no_collision
 		jmp @default ;
-
-	@special_tile_collision:
-		store tempCollision, tempCollisionTile
-		sty tempCollisionTilePos
-
-			lda #1
-		rts
-
-	@special_tile_no_collision:
-		sty tempCollisionTilePos
-
-			store tempCollision, tempCollisionTile
-		lda #0
-		rts
-
 
 	@collision_ice:
 		lda #1
