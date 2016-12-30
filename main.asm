@@ -30,9 +30,14 @@
 .segment "ZEROPAGE"
 	watchme: 						.res 1
 	skippedSprites:					.res 1 ; Counter for every time we have a sprite and can't fit it into memory. If this is non-zero, there's a potential problem with the engine and/or level layout.
-	; Set of "scratch" variables for whatever we may be doing at the time. 
-	; A little hard to track honestly, but the NES has very limited ram. 
-	; Other option is to have multiple names refer to one address, but that actually seems more confusing.
+	; Set of short-lived "scratch" variables for whatever we may be doing at the time. 
+	; These should ONLY be used in short code sections, when an extra accumulator might be useful. 
+	; All code using them should fit into roughly 10 lines, and should not jsr to other methods 
+	; (which could also use them).
+	scratch0:						.res 1
+	scratch1:						.res 1
+	; Similar longer-term scratch variables stemming from a thought that I'd need more ZP variables earlier on.
+	; TODO: Start replacing these with sane ZP vars. The engine is nearly complete, and we're using < 1/2 ZP.
 	temp0: 							.res 1
 	temp1: 							.res 1
 	temp2:							.res 1
@@ -95,7 +100,7 @@
 	currentSprite:					.res 1
 	xScrollChange:					.res 1
 	duckPausePosition:				.res 1
-	macroTmp:						.res 2
+	macroTmp:						.res 2 ; MACROS. ONLY. (Do not use in macros that call other macros, as a general rule.)
 	gemCount:						.res 1 ; NOTE: This should *not* be used for comparisons; it uses 0-9 to form the counts for the ui.
 	totalGemCount:					.res 1 ; So does this.
 	currentBank:					.res 1
@@ -110,6 +115,7 @@
 	extendedSpriteDataX:			.res 1
 	varSpriteDataX:					.res 1
 	varSpriteDataOffset:			.res 1
+	spriteOffsetTmp:				.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -885,7 +891,7 @@ load_current_line:
 				asl
 				tax
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_LEVEL_DATA_POSITION, x
-				sta macroTmp ; TODO: This is... bad form. Plain and simple. Need it to compare y, below.
+				sta scratch0
 				cmp #0
 				bne @must_test
 					; okay, so either you're sprite 0 in the level, or you're gone. If you're sprite zero, you should still have a non-zero y coordinate.
@@ -894,7 +900,7 @@ load_current_line:
 					beq @not_covered_and_empty
 				
 				@must_test: 
-				cpy macroTmp
+				cpy scratch0
 				bne @not_covered
 					; Okay, if you were a gem we have a little more work for you...
 					lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
@@ -3282,10 +3288,10 @@ get_var_sprite_data_offset:
 	and #%00000001
 	cmp #0
 	beq @do_nothing
-		stx macroTmp
+		stx spriteOffsetTmp
 		lda #$b0
 		sec
-		sbc macroTmp
+		sbc spriteOffsetTmp
 
 		tax
 		rts
@@ -3299,10 +3305,10 @@ get_var_sprite_data_offset_y:
 	and #%00000001
 	cmp #0
 	beq @do_nothing
-		stx macroTmp
+		stx spriteOffsetTmp
 		lda #$b0
 		sec
-		sbc macroTmp
+		sbc spriteOffsetTmp
 
 		tay
 		rts
