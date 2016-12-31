@@ -20,9 +20,8 @@
 ; $400-41f: Unused
 ; $420-4ff: Static collectible data
 ; $500-55f: Screen buffer
-; $560-5c0: Animated tile buffer
-; $5c0-5ff: Unused
-; $600-6ff: Unused
+; $560-5ff: Unused
+; $600-6ff: Animated tile buffer (If we need space, this could shrink to 1x, and reloaded every cycle)
 ; $700-7bf: Extended sprite data
 ; $7c0-7ff: Current level collectible data
 
@@ -128,7 +127,7 @@
 	GAME_BEATEN_BYTE				= $4fe
 	NEXT_ROW_CACHE					= $500
 	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
-	ANIMATED_TILE_CACHE				= $560
+	ANIMATED_TILE_CACHE				= $600
 	EXTENDED_SPRITE_DATA			= $700
 	LEFT_ATTR_MASK					= %00110011
 	RIGHT_ATTR_MASK					= %11001100
@@ -231,6 +230,7 @@
 	TILE_LEVEL_END			= 49
 
 	WATER_TILE_LOCATION		= $0600
+	FIRE_TILE_LOCATION		= $0660
 
 	GAME_TILE_A				= $e6
 	GAME_TILE_0				= $dc
@@ -4347,6 +4347,53 @@ draw_switchable_tiles:
 		bne @loop_animated_tiles_4
 
 
+	; Fire too
+	dec tempAddr+1
+	ldy #96
+	@loop_animated_tiles_5: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #128
+		bne @loop_animated_tiles_5
+	
+	ldy #224
+	@loop_animated_tiles_6: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #0
+		bne @loop_animated_tiles_6
+
+
+	; Now get the bottom tiles.
+	ldy #96
+	inc tempAddr+1 ; Next row please.
+	@loop_animated_tiles_7: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #128
+		bne @loop_animated_tiles_7
+	
+	ldy #224
+	@loop_animated_tiles_8: 
+		lda (tempAddr), y
+		sta ANIMATED_TILE_CACHE, x
+
+		iny
+		inx
+		cpy #0
+		bne @loop_animated_tiles_8
+
+
+
 	plx
 	rts
 
@@ -4640,7 +4687,13 @@ update_arbitrary_tile:
 
 	rts
 
-animate_tiles: 
+animate_tiles:
+	lda frameCounter
+	and #%00000010
+	beq animate_water_tiles
+	jmp animate_fire_tiles
+
+animate_water_tiles: 
 	lda frameCounter
 	and #%00010000
 	asl ; Get the var we got from frameCounter to be either 32 or 0, allowing us to select data from one of our two tiles.
@@ -4655,6 +4708,25 @@ animate_tiles:
 	set_ppu_addr WATER_TILE_LOCATION+$100 ; second tile row
 	.repeat 32, I
 		lda ANIMATED_TILE_CACHE+64+I, x
+		sta PPU_DATA
+	.endrepeat
+	rts
+
+animate_fire_tiles: 
+	lda frameCounter
+	and #%00010000
+	asl ; Get the var we got from frameCounter to be either 32 or 0, allowing us to select data from one of our two tiles.
+	tax
+
+	set_ppu_addr FIRE_TILE_LOCATION
+	.repeat 32, I
+		lda ANIMATED_TILE_CACHE+128+I, x
+		sta PPU_DATA
+	.endrepeat
+
+	set_ppu_addr FIRE_TILE_LOCATION+$100 ; second tile row
+	.repeat 32, I
+		lda ANIMATED_TILE_CACHE+192+I, x
 		sta PPU_DATA
 	.endrepeat
 	rts
