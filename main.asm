@@ -269,6 +269,7 @@
 	SONG_CRAPPY 		= 5
 	SONG_ICE_CRAPPY 	= 1
 	SONG_CRAPPY_DESERT	= 4
+	SONG_FIRE			= 10
 	SONG_DEATH			= 3
 	SONG_LEVEL_END		= 9
 
@@ -4177,6 +4178,12 @@ play_music_for_dimension:
 		jsr music_play
 		rts
 	@not_barren:
+	cmp #DIMENSION_AGGRESSIVE
+	bne @not_aggressive
+		lda #SONG_FIRE
+		jsr music_play
+		rts
+	@not_aggressive:
 	; Fall back to default track for consistency's sake.
 	lda #SONG_CRAPPY
 	jsr music_play
