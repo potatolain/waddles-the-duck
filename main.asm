@@ -1294,15 +1294,12 @@ draw_current_nametable_row:
 		sta PPU_DATA
 	.endrepeat
 		
-	lda PPU_STATUS
-	lda nametableAddr
-	clc
-	adc #$1
-	sta nametableAddr
+
+	; nmi methods should be extremely lightweight when possible... so, we know we're on the first row and have no overflow - 
+	; we can skip doing a proper 16 bit add.
 	lda nametableAddr+1
-	adc #0
-	sta nametableAddr+1
 	sta PPU_ADDR
+	inc nametableAddr
 	lda nametableAddr
 	sta PPU_ADDR
 	
@@ -4574,10 +4571,11 @@ main_loop:
 	jsr update_buffer_for_warp_zone
 	jsr sound_update
 
+	lda #0
+	sta tempf ; Keep track of what to skip....
 	jsr vblank_wait
 	
 	; Not ideal to do this inside vblank...
-	; TODO: Factor in player speed -- 0 v 2 (Probably drawing stuff twice)
 	lda #%00001110
 	and playerPosition
 	cmp #0
@@ -4594,9 +4592,8 @@ main_loop:
 			jsr seed_level_position_r
 		@do_draw:
 		jsr draw_current_nametable_row
+		store #1, tempf
 	@go_on:
-
-	; If we're running out of cycles during vblank, this probably doesn't have to happen most of the time.
 
 	; Turn off 32 bit adding to do arbitrary graphical updates
 	lda ppuCtrlBuffer
@@ -4610,6 +4607,11 @@ main_loop:
 		jsr update_arbitrary_tile
 		jmp @after_switchables
 	@no_arbitrary_tile:
+
+	; Skip animation if we've updated the next row this time around... we don't have enough cycles left!
+	lda tempf
+	cmp #0
+	bne @after_switchables
 
 	lda frameCounter
 	and #%00000001
