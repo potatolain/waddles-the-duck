@@ -340,7 +340,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 3
+	BASE_NUMBER_OF_LEVELS = 4
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
@@ -955,17 +955,6 @@ load_current_line:
 			lda (lvlSpriteDataAddr), y ; sprite id.
 			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_ID, x
 			iny
-			lda tempd
-			cmp #0
-			beq @normal_extra
-				; If tempd is set, that means a linked gem box has been hit. Ignore extra data
-				lda #0
-				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
-				jmp @after_extra
-			@normal_extra:
-			lda (lvlSpriteDataAddr), y ; Extra data
-			sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
-			@after_extra:
 			lda #0
 			sta tempAddr+1
 			lda tempa
@@ -1056,6 +1045,29 @@ load_current_line:
 
 						
 			@not_collectible:
+
+			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+			and #SPRITE_DATA_TYPE_MASK
+			cmp #SPRITE_TYPE_FIREBALL
+			beq @fireball_extra
+
+			lda tempd
+			cmp #0
+			beq @normal_extra
+				; If tempd is set, that means a linked gem box has been hit. Ignore extra data
+				lda #0
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				jmp @after_extra
+			@fireball_extra:
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				jmp @after_extra
+			@normal_extra:
+				lda (lvlSpriteDataAddr), y ; Extra data
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				jmp @after_extra
+			@after_extra:
+
 
 
 			; Skip @move_on because we increased y ourselves. Do it one more time to finish up.
@@ -1702,8 +1714,6 @@ do_collision_test:
 		lda tempCollision
 		cmp #TILE_CLOUD
 		beq @no_collision
-		cmp #TILE_PLANT
-		beq @no_collision
 		jmp @default ;
 
 	@collision_ice:
@@ -2318,9 +2328,6 @@ do_sprite_movement:
 		jsr blow_away_current_sprite
 		jmp @remove
 
-	@go_no_motion: 
-		jmp @no_motion
-
 
 	@loop:
 		stx tempa
@@ -2389,11 +2396,23 @@ do_sprite_movement:
 			beq @go_no_motion
 			cmp #SPRITE_TYPE_DIMENSIONER
 			beq @go_no_motion
+			cmp #SPRITE_TYPE_FIREBALL
+			bne @no_fireball
+				jsr do_fireball_movement
+				jmp @no_motion
+			@no_fireball:
 
 			; Don't bother calculating gravity if the sprite isn't visible.
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 			cmp #0
 			beq @go_no_motion
+
+			; TODO: This is kind of a mess... 
+			jmp @skip_inline_method
+			@go_no_motion: 
+				jmp @no_motion
+			@skip_inline_method:
+
 
 			
 			jsr get_current_sprite_y
@@ -2694,8 +2713,18 @@ do_sprite_movement:
 					lsr ; make it a multiple of 8
 				.endrepeat
 				sta temp7
-				; Intentional fallthru
+				jmp @after_anim
 			@not_normal:
+			cmp #SPRITE_ANIMATION_BINARY
+			bne @not_binary
+				lda frameCounter
+				and #%00000100
+				lsr
+				lsr
+				sta temp7
+				lda #0
+				sta temp0
+			@not_binary:
 			@after_anim:
 
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
@@ -2753,6 +2782,47 @@ do_sprite_movement:
 	pla
 	sta levelPosition
 	rts
+
+; Fireballs are a real far-cry from everything else, so let's give them their own separate method for movement.
+do_fireball_movement:
+	lda currentDimension
+	cmp #DIMENSION_AGGRESSIVE
+	beq @okay_doit
+		@make_sprite_goner:
+		; Oh? Well, ummm... this is awkward. I'll just go away then
+		lda #0
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+		rts
+	@okay_doit:
+
+
+	lda frameCounter
+	and #%01000000
+	bne @make_sprite_goner ; Only show this thing every other cycle
+
+	lda frameCounter
+	and #%00111111
+	sta tempe
+	clc
+	adc tempe
+	lsr tempe
+	adc tempe
+	cmp #128
+	bcs @make_sprite_goner ; The speed we use causes us to go a bit over 128; use for extra pause time.
+	cmp #64
+	bcc @no_flip
+		sta tempe
+		lda #128
+		sec
+		sbc tempe
+	@no_flip:
+	sta tempe
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+	sec
+	sbc tempe
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	rts
+
 
 ; Little bit of context... sprites are hard, and our logic is... pretty complicated. 
 ; In an ideal world this wouldn't exist, and when we put individual sprites into VAR_SPRITE_DATA, we'd check if they are offscreen,
@@ -3383,6 +3453,10 @@ do_sprite_collision:
 	bne @not_invuln
 		jmp do_player_death
 	@not_invuln:
+	cmp #SPRITE_TYPE_FIREBALL
+	bne @not_fireball
+		jmp do_player_death
+	@not_fireball:
 	cmp #SPRITE_TYPE_DIMENSIONER
 	bne @not_dimensioner
 		; This thing transports us between dimensions... mark it up.
@@ -5146,13 +5220,13 @@ nmi:
 banktable
 
 .if DEBUGGING = 1
-	GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT
+	GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
 	lvldebug:
 		.include "levels/lvl_debug_meta.asm"
 		.include "levels/processed/lvl_debug_tiles.asm"
 		.include "levels/processed/lvl_debug_sprites.asm"
 .else
-	GAME_GEM_TOTAL = LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT
+	GAME_GEM_TOTAL = LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
 .endif
 
 lvl1:
@@ -5168,12 +5242,17 @@ lvl3:
 	.include "levels/lvl3_meta.asm"
 	.include "levels/processed/lvl3_tiles.asm"
 	.include "levels/processed/lvl3_sprites.asm"
+lvl4:
+	.include "levels/lvl4_meta.asm"
+	.include "levels/processed/lvl4_tiles.asm"
+	.include "levels/processed/lvl4_sprites.asm"
+
 
 leveldata_table:
 	.if DEBUGGING = 1 
-		.word lvldebug, lvl1, lvl2, lvl3
+		.word lvldebug, lvl1, lvl2, lvl3, lvl4
 	.else
-		.word lvl1, lvl2, lvl3
+		.word lvl1, lvl2, lvl3, lvl4
 	.endif
 
 

@@ -313,7 +313,7 @@ game_end:
 	write_string "Inspired by Eversion", $2201
 	write_string "Thanks for playing!", $22a6
 	write_string "No ducks were harmed in the", $2362
-	write_string "Making of this NES game", $2382
+	write_string "Making of this game", $2382
 	jsr enable_all
 	jsr vblank_wait
 
