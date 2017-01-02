@@ -5220,13 +5220,12 @@ nmi:
 banktable
 
 .if DEBUGGING = 1
-	GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
 	lvldebug:
 		.include "levels/lvl_debug_meta.asm"
 		.include "levels/processed/lvl_debug_tiles.asm"
 		.include "levels/processed/lvl_debug_sprites.asm"
 .else
-	GAME_GEM_TOTAL = LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
+	LVL_DEBUG_COLLECTIBLE_COUNT = 0
 .endif
 
 lvl1:
@@ -5250,10 +5249,12 @@ lvl4:
 
 leveldata_table:
 	.if DEBUGGING = 1 
-		.word lvldebug, lvl1, lvl2, lvl3, lvl4
-	.else
-		.word lvl1, lvl2, lvl3, lvl4
+		.word lvldebug
 	.endif
+	.word lvl1, lvl2, lvl3, lvl4
+
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
+
 
 
 default_chr:
