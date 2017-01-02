@@ -465,8 +465,6 @@ jmp show_title
 
 load_graphics_data: 
 
-	jsr load_palettes_for_dimension
-
 	set_ppu_addr $3f10
 	ldy #0
 	@palette_loop_b:
@@ -496,6 +494,8 @@ load_graphics_data:
 	store #>(default_sprite_chr), tempAddr+1
 
 	jsr PKB_unpackblk
+
+	jsr load_palettes_for_dimension
 		
 	rts
 	
@@ -4618,6 +4618,8 @@ do_dimensional_transfer:
 			@done_d:
 	@done:
 	jsr vblank_wait
+	jsr load_palettes_for_dimension ; Reload palettes - our fade stuff is imperfect, and this works around that.
+	reset_ppu_scrolling
 	jsr do_sprite0
 	lda temp4
 	sta ppuCtrlBuffer
@@ -5052,8 +5054,9 @@ do_pause_screen:
 
 		jsr disable_all
 		jsr vblank_wait
-		jsr load_palettes_for_dimension
 		jsr load_sprite_palettes
+		jsr load_palettes_for_dimension
+
 		jsr restore_duck
 		reset_ppu_scrolling
 		lda #0
