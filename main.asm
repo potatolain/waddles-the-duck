@@ -2510,7 +2510,7 @@ do_sprite_movement:
 				sec
 				sbc #HEADER_PIXEL_OFFSET
 				sec
-				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
 				sta tempf
 				
 				.repeat 4
@@ -2585,7 +2585,7 @@ do_sprite_movement:
 				jsr get_current_sprite_y
 				sec
 				sbc #HEADER_PIXEL_OFFSET
-				sbc #SPRITE_HEIGHT_OFFSET+2 ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
+				sbc #SPRITE_HEIGHT_OFFSET ; Shift the position on the sprite up a little bit, since we let them sink into the ground for appearance purposes.
 				sta tempf
 
 				.repeat 4
