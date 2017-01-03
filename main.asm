@@ -2098,27 +2098,7 @@ do_player_movement:
 	lda #0
 	sta playerIsInScrollMargin
 
-	; TODO: If I aggressively start and stop running I can likely start skipping blocks. Should we lock you to running/walking for a few frames? (If we do that right it might even feel more natural.)
-	lda playerVelocity
-	cmp #PLAYER_VELOCITY_FAST
-	beq @fast
-	cmp #256-PLAYER_VELOCITY_FAST
-	beq @fast
-		; slow; 1px per vblank
-		lda playerPosition
-		and #%00001111
-		cmp #0
-		bne @not_scrollin
-		jmp @scrollit
-	@fast: 
-		; fast; 2px per vblank
-		lda playerPosition
-		and #%00001110
-		cmp #0
-		bne @not_scrollin
-		; intentional fallthru.
 
-	@scrollit:
 	lda playerVelocity
 	cmp #0
 	beq @not_scrollin
