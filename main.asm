@@ -267,7 +267,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
 	SONG_CRAPPY 		= 5
-	SONG_ICE_CRAPPY 	= 1
+	SONG_ICE_CRAPPY 	= 11
 	SONG_CRAPPY_DESERT	= 4
 	SONG_FIRE			= 10
 	SONG_DEATH			= 3
