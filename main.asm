@@ -340,7 +340,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 4
+	BASE_NUMBER_OF_LEVELS = 5
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
@@ -5228,15 +5228,19 @@ lvl4:
 	.include "levels/lvl4_meta.asm"
 	.include "levels/processed/lvl4_tiles.asm"
 	.include "levels/processed/lvl4_sprites.asm"
+lvl5:
+	.include "levels/lvl5_meta.asm"
+	.include "levels/processed/lvl5_tiles.asm"
+	.include "levels/processed/lvl5_sprites.asm"
 
 
 leveldata_table:
 	.if DEBUGGING = 1 
 		.word lvldebug
 	.endif
-	.word lvl1, lvl2, lvl3, lvl4
+	.word lvl1, lvl2, lvl3, lvl4, lvl5
 
-GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT
 
 
 
