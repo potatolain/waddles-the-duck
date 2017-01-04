@@ -5274,7 +5274,7 @@ default_sprite_palettes: ; Drawn at same time as above.
 
 menu_palettes: 
 	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
-	.byte $0f,$00,$10,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
+	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
 
 	
 .segment "CHUNK"
