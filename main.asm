@@ -340,7 +340,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 5
+	BASE_NUMBER_OF_LEVELS = 6
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
@@ -2777,10 +2777,14 @@ do_fireball_movement:
 
 
 	lda frameCounter
+	sec
+	sbc EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
 	and #%01000000
 	bne @make_sprite_goner ; Only show this thing every other cycle
 
 	lda frameCounter
+	sec
+	sbc EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x ; Add an element of "randomness" to when they jump.
 	and #%00111111
 	sta tempe
 	clc
@@ -3745,6 +3749,15 @@ get_game_gem_count:
 					clc
 					adc #6 ; bump to next level
 					sta temp1
+
+					cmp #$a0
+					bcc @no_3rd_digit
+					inc temp2
+					sec
+					sbc #$a0
+					sta temp1
+					@no_3rd_digit:
+
 				@no_bump:
 			@no_add:
 			pla
@@ -3754,7 +3767,7 @@ get_game_gem_count:
 		inx
 		cpx #COLLECTIBLE_DATA_LENGTH
 		bne @loop
-		lda temp1
+		lda temp2
 
 	rts
 
@@ -3799,7 +3812,10 @@ get_level_gem_count:
 
 get_game_gem_total:
 	; This looks really gross... all it's doing is taking our total count, and converting it to BCD... each hex digit is now a decimal digit.
-	lda #((GAME_GEM_TOTAL .MOD 10) + ((GAME_GEM_TOTAL / 10) * 16))
+	lda #((GAME_GEM_TOTAL .MOD 10) + ((GAME_GEM_TOTAL / 10) .MOD 10 * 16))
+	sta tempc
+	lda #((GAME_GEM_TOTAL / 100)) .MOD 10
+	sta tempd
 	rts
 	
 .macro do_x_velocity_lock DIRECTION, MAX_DIST, VEL_FAST, VEL_NORMAL
@@ -5232,15 +5248,19 @@ lvl5:
 	.include "levels/lvl5_meta.asm"
 	.include "levels/processed/lvl5_tiles.asm"
 	.include "levels/processed/lvl5_sprites.asm"
+lvl6:
+	.include "levels/lvl6_meta.asm"
+	.include "levels/processed/lvl6_tiles.asm"
+	.include "levels/processed/lvl6_sprites.asm"
 
 
 leveldata_table:
 	.if DEBUGGING = 1 
 		.word lvldebug
 	.endif
-	.word lvl1, lvl2, lvl3, lvl4, lvl5
+	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6
 
-GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT
 
 
 

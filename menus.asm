@@ -118,6 +118,8 @@ load_title:
 		write_string .sprintf("Gems: "), $20e8
 
 		jsr get_game_gem_count
+		draw_current_digit
+		lda temp1
 		draw_current_num
 
 		lda #$ff
@@ -129,6 +131,8 @@ load_title:
 
 
 		jsr get_game_gem_total
+		draw_current_digit
+		lda tempc
 		draw_current_num
 
 		; Quick and dirty in-place macro to draw gem count based on the level.

@@ -173,6 +173,13 @@
   .byte $00, $01, $02, $03, $04, $05, $06
 .endmacro
 
+.macro draw_current_digit
+	and #%00001111
+	clc
+	adc #NUM_SYM_TABLE_START
+	sta PPU_DATA
+.endmacro
+
 .macro draw_current_num
 	sta macroTmp
 	.repeat 4
