@@ -1050,6 +1050,8 @@ load_current_line:
 			and #SPRITE_DATA_TYPE_MASK
 			cmp #SPRITE_TYPE_FIREBALL
 			beq @fireball_extra
+			cmp #SPRITE_TYPE_SHARK
+			beq @shark_extra
 
 			lda tempd
 			cmp #0
@@ -1061,6 +1063,26 @@ load_current_line:
 			@fireball_extra:
 				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				jmp @after_extra
+			@shark_extra:
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+				sta temp8
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+				.repeat 4
+					lsr temp8
+					ror
+				.endrepeat
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				; That stored the original x position... we'll have to undo the math we just did to unpack it into two bytes... 
+				; We want it to rotate over a 9 block area, so... let's subtract two now to make that math easier
+				.repeat 4
+					dec EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+				.endrepeat
+				; While we're here, let's bump this sprite up a bit, since sharks are short and water is less short
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+				sec
+				sbc #3
+				sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 				jmp @after_extra
 			@normal_extra:
 				lda (lvlSpriteDataAddr), y ; Extra data
@@ -2381,6 +2403,11 @@ do_sprite_movement:
 				jsr do_fireball_movement
 				jmp @no_motion
 			@no_fireball:
+			cmp #SPRITE_TYPE_SHARK
+			bne @no_shark
+				jsr do_shark_movement
+				jmp @no_motion
+			@no_shark:
 
 			; Don't bother calculating gravity if the sprite isn't visible.
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
@@ -2695,6 +2722,23 @@ do_sprite_movement:
 				sta temp7
 				jmp @after_anim
 			@not_normal:
+			cmp #SPRITE_ANIMATION_FAST
+			bne @not_fast
+				lda frameCounter
+				and #%00000100
+				lsr
+				lsr
+				sta temp6
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+				and #SPRITE_DATA_DIRECTION_MASK
+				; 0010,0000
+				.repeat 5
+					lsr ; make it a multiple of 8
+				.endrepeat
+				sta temp7
+				jmp @after_anim
+			@not_fast:
+
 			cmp #SPRITE_ANIMATION_BINARY
 			bne @not_binary
 				lda frameCounter
@@ -2705,6 +2749,17 @@ do_sprite_movement:
 				lda #0
 				sta temp0
 			@not_binary:
+			cmp #SPRITE_ANIMATION_LR
+			bne @not_lr
+				lda #0
+				sta temp6
+				lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+				and #SPRITE_DATA_DIRECTION_MASK
+				.repeat 5
+					lsr
+				.endrepeat
+				sta temp7
+			@not_lr:
 			@after_anim:
 
 			lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
@@ -2775,6 +2830,10 @@ do_fireball_movement:
 		rts
 	@okay_doit:
 
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+	and #(SPRITE_DATA_DIRECTION_MASK ^ $ff)
+	ora #SPRITE_DIRECTION_RIGHT
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
 
 	lda frameCounter
 	sec
@@ -2791,6 +2850,7 @@ do_fireball_movement:
 	adc tempe
 	lsr tempe
 	adc tempe
+	sta tempe
 	cmp #128
 	bcs @make_sprite_goner ; The speed we use causes us to go a bit over 128; use for extra pause time.
 	cmp #64
@@ -2799,13 +2859,84 @@ do_fireball_movement:
 		lda #128
 		sec
 		sbc tempe
+		sta tempe
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+		and #(SPRITE_DATA_DIRECTION_MASK ^ $ff)
+		ora #SPRITE_DIRECTION_LEFT
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
 	@no_flip:
-	sta tempe
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
 	sec
 	sbc tempe
 	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
 	rts
+
+do_shark_movement:
+	lda currentDimension
+	cmp #DIMENSION_BARREN
+	beq @okay_doit
+		@make_sprite_goner:
+		; Oh? Well, ummm... this is awkward. I'll just go away then
+		lda #255
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		rts
+	@okay_doit:
+
+	lda #0
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+	.repeat 4
+		asl
+		rol EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+	.endrepeat
+	sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+
+	lda frameCounter
+	and #%10000000
+	cmp #0
+	beq @subtract
+		lda frameCounter
+		and #%01111111
+		clc
+		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		adc #0
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+		and #SPRITE_DATA_DIRECTION_MASK^$ff
+		ora #SPRITE_DIRECTION_RIGHT
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
+		rts
+	@subtract:
+		lda frameCounter
+		and #%01111111
+		sta tempe
+		lda #128
+		sec
+		sbc tempe
+		sta tempe
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+		clc
+		adc tempe
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+		adc #0
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
+
+		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+		and #SPRITE_DATA_DIRECTION_MASK^$ff
+		ora #SPRITE_DIRECTION_LEFT
+		sta EXTENDED_SPRITE_DATA+SPRITE_DATA_DIRECTION, x
+
+
+		rts
 
 
 ; Little bit of context... sprites are hard, and our logic is... pretty complicated. 
@@ -2989,6 +3120,8 @@ draw_2x1_sprite_size:
 	adc #8
 	sta VAR_SPRITE_DATA+7, y
 
+	lda #0
+	sta tempf
 	
 	lda temp6
 	.repeat 4
@@ -3010,12 +3143,22 @@ draw_2x1_sprite_size:
 	sta VAR_SPRITE_DATA+8, y
 	sta VAR_SPRITE_DATA+12, y
 	
+	; Put sharks behind the background.
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	and #SPRITE_DATA_TYPE_MASK
+	cmp #SPRITE_TYPE_SHARK
+	bne @not_shark
+		lda #%00100000
+		sta tempf
+	@not_shark:
+
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
 	and #SPRITE_DATA_PALETTE_MASK
 	rol
 	rol
 	rol
 	and #%00000011
+	ora tempf
 	sta VAR_SPRITE_DATA+2, y
 	sta VAR_SPRITE_DATA+6, y
 	sta VAR_SPRITE_DATA+10, y
@@ -3441,6 +3584,10 @@ do_sprite_collision:
 	bne @not_fireball
 		jmp do_player_death
 	@not_fireball:
+	cmp #SPRITE_TYPE_SHARK
+	bne @not_shark
+		jmp do_player_death
+	@not_shark:
 	cmp #SPRITE_TYPE_DIMENSIONER
 	bne @not_dimensioner
 		; This thing transports us between dimensions... mark it up.
