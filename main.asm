@@ -5024,18 +5024,20 @@ show_level:
 	sta ppuCtrlBuffer
 
 	jsr show_hud
-	jsr enable_all
-	jsr load_sprite0
-	reset_ppu_scrolling
-	lda #PLAYER_DIRECTION_RIGHT
-	sta playerDirection
-	jsr initialize_player_sprite
-	
+
 	; Turn on 32 bit adding for addresses to load rows, instead of columns.
 	lda ppuCtrlBuffer
 	ora #%00000100
 	sta ppuCtrlBuffer
 
+	reset_ppu_scrolling
+	jsr enable_all
+	jsr load_sprite0
+	;reset_ppu_scrolling
+	lda #PLAYER_DIRECTION_RIGHT
+	sta playerDirection
+	jsr initialize_player_sprite
+	
 	jsr play_music_for_dimension
 	
 	jmp main_loop
