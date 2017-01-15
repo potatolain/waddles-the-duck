@@ -38,7 +38,7 @@ load_menu:
 		iny
 		cpy #$20
 		bne @palette_loop
-
+	bank #BANK_CHR
 	set_ppu_addr $0000
 	store #<(menu_chr_data), tempAddr
 	store #>(menu_chr_data), tempAddr+1
@@ -47,6 +47,7 @@ load_menu:
 	store #<(default_sprite_chr), tempAddr
 	store #>(default_sprite_chr), tempAddr+1
 	jsr PKB_unpackblk
+	bank #BANK_SPRITES_AND_LEVEL
 
 	; wipe out the nametable so we don't have any leftovers.
 	set_ppu_addr $2000

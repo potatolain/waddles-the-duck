@@ -190,7 +190,7 @@
 	TILE_ROW_ICE_AGE			= $8
 	TILE_ROW_AGGRESSIVE			= $4
 	TILE_ROW_AUTUMN				= $a
-	TILE_ROW_END_OF_DAYS		= $a
+	TILE_ROW_END_OF_DAYS		= $4
 
 
 	; TODO: The logic around this could probably be axed at this point - we just always scroll if you're not at the start/end of the level.
@@ -208,6 +208,7 @@
 	BANK_SWITCH_ADDR 		= $8000
 	BANK_SPRITES_AND_LEVEL	= 0
 	BANK_MUSIC_AND_SOUND	= 1
+	BANK_CHR				= 1
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
@@ -270,6 +271,7 @@
 	SONG_ICE_CRAPPY 	= 11
 	SONG_CRAPPY_DESERT	= 4
 	SONG_FIRE			= 10
+	SONG_EOD			= 12
 	SONG_DEATH			= 3
 	SONG_LEVEL_END		= 9
 
@@ -340,7 +342,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 6
+	BASE_NUMBER_OF_LEVELS = 7
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
@@ -465,15 +467,8 @@ jmp show_title
 
 load_graphics_data: 
 
-	set_ppu_addr $3f10
-	ldy #0
-	@palette_loop_b:
-		lda default_sprite_palettes, y
-		sta PPU_DATA
-		iny
-		cpy #$10
-		bne @palette_loop_b
-
+	jsr load_sprite_palettes
+	bank #BANK_CHR
 	store #<(default_chr), tempAddr
 	store #>(default_chr), tempAddr+1
 	ldx #0
@@ -496,6 +491,8 @@ load_graphics_data:
 	jsr PKB_unpackblk
 
 	jsr load_palettes_for_dimension
+
+	bank #BANK_SPRITES_AND_LEVEL
 		
 	rts
 	
@@ -4337,8 +4334,21 @@ load_palettes_for_pause:
 	rts
 
 load_sprite_palettes:
-	ldx #0
 	set_ppu_addr $3f10
+
+	lda currentDimension
+	cmp #DIMENSION_END_OF_DAYS
+	bne @normal
+		ldx #0
+		@loop_dark:
+			lda dark_sprite_palettes, x
+			sta PPU_DATA
+			inx
+			cpx #16
+			bne @loop_dark
+
+	@normal:
+	ldx #0
 	@loop:
 		lda default_sprite_palettes, x
 		sta PPU_DATA
@@ -4398,6 +4408,12 @@ play_music_for_dimension:
 		jsr music_play
 		rts
 	@not_aggressive:
+	cmp #DIMENSION_END_OF_DAYS
+	bne @not_eod
+		lda #SONG_EOD
+		jsr music_play
+		rts
+	@not_eod:
 	; Fall back to default track for consistency's sake.
 	lda #SONG_CRAPPY
 	jsr music_play
@@ -4482,6 +4498,8 @@ get_row_from_a:
 		rts
 
 draw_switchable_tiles: 
+
+	bank #BANK_CHR
 
 	; Okay, we've gotta swap tiles. Which ones do we want?
 	lda currentDimension
@@ -4616,6 +4634,7 @@ draw_switchable_tiles:
 
 
 	plx
+	bank #BANK_SPRITES_AND_LEVEL
 	rts
 
 ; Try to create a "Smooth" (well, for NES) fade in/out. Buys us time to swap out tiles, etc.
@@ -4761,6 +4780,7 @@ do_dimensional_transfer:
 			@done_d:
 	@done:
 	jsr vblank_wait
+	jsr load_sprite_palettes
 	jsr load_palettes_for_dimension ; Reload palettes - our fade stuff is imperfect, and this works around that.
 	reset_ppu_scrolling
 	jsr do_sprite0
@@ -5401,26 +5421,22 @@ lvl6:
 	.include "levels/lvl6_meta.asm"
 	.include "levels/processed/lvl6_tiles.asm"
 	.include "levels/processed/lvl6_sprites.asm"
+lvl7:
+	.include "levels/lvl7_meta.asm"
+	.include "levels/processed/lvl7_tiles.asm"
+	.include "levels/processed/lvl7_sprites.asm"
+
 
 
 leveldata_table:
 	.if DEBUGGING = 1 
 		.word lvldebug
 	.endif
-	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6
+	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6, lvl7
 
-GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT + LVL7_COLLECTIBLE_COUNT
 
 
-
-default_chr:
-	.incbin "graphics/map_tiles.chr"
-	
-default_sprite_chr:
-	.incbin "graphics/processed/sprites.pkb"
-
-menu_chr_data: 
-	.incbin "graphics/processed/title_tiles.pkb"
 
 	
 default_palettes: 
@@ -5440,6 +5456,8 @@ desert_palettes:
 default_sprite_palettes: ; Drawn at same time as above.
 	; 0) duck. 1) turtle
 	.incbin "graphics/default_sprite.pal"
+dark_sprite_palettes:
+	.incbin "graphics/dark_sprite.pal"
 
 menu_palettes: 
 	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
@@ -5460,6 +5478,16 @@ all_music:
 
 all_sfx: 
 	.include "sound/sfx.s"
+
+default_chr:
+	.incbin "graphics/map_tiles.chr"
+	
+default_sprite_chr:
+	.incbin "graphics/processed/sprites.pkb"
+
+menu_chr_data: 
+	.incbin "graphics/processed/title_tiles.pkb"
+
 
 .segment "BANK2"
 banktable
