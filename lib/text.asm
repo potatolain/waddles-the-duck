@@ -63,6 +63,7 @@ show_professor_text:
         jsr disable_all
         jsr vblank_wait
         jsr show_updated_text
+		reset_ppu_scrolling
         jsr enable_all
         lda textPage
         cmp #255
