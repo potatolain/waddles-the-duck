@@ -221,7 +221,9 @@
 		.elseif (char = '?')
 			char .set GAME_TILE_0 - 5
 		.elseif (char = '-')
-			char .set GAME_TILE_0 - 15
+			char .set GAME_TILE_0 - 18
+		.elseif (char = $27)
+			char .set GAME_TILE_0 - 22
 		.else; (char = $20) ; space
 			char .set GAME_TILE_0-13
 		.endif

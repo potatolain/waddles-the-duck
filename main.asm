@@ -116,6 +116,7 @@
 	varSpriteDataOffset:			.res 1
 	spriteOffsetTmp:				.res 1
 	textPage:						.res 1
+	hasTalkedToMrDuck:				.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -509,6 +510,7 @@ load_level:
 	sta tempPlayerPosition+1
 	sta playerXVelocityLockTime
 	sta playerYVelocityLockTime
+	sta hasTalkedToMrDuck
 	lda #1
 	sta playerIsInScrollMargin
 	jsr seed_level_position_l
@@ -3597,6 +3599,15 @@ do_sprite_collision:
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_SPEED, x
 		sta warpDimensionB
 	@not_dimensioner:
+	cmp #SPRITE_TYPE_PROFESSOR
+	bne @not_professor
+		lda hasTalkedToMrDuck
+		cmp #1
+		beq @not_professor
+		lda #1
+		sta hasTalkedToMrDuck
+		jsr show_bottom_hud
+	@not_professor:
 
 	rts
 

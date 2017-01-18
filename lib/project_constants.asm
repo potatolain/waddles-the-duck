@@ -1,4 +1,4 @@
-.define  		BUILD 			5054  
+.define  		BUILD 			5064  
 .define 		VERSION 		"0.1a" 
-.define 		BUILD_DATE		"Tue 01/17/2017 20:22" 
-.define 		SPLASH_MESSAGE 	"Smells oddly refreshing " 
+.define 		BUILD_DATE		"Tue 01/17/2017 20:43" 
+.define 		SPLASH_MESSAGE 	"Bugs! Bugs as far as the eyes   can see! " 
