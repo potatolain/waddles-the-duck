@@ -115,6 +115,7 @@
 	varSpriteDataX:					.res 1
 	varSpriteDataOffset:			.res 1
 	spriteOffsetTmp:				.res 1
+	textPage:						.res 1
 
 
 	CHAR_TABLE_START 				= $e0
@@ -209,6 +210,7 @@
 	BANK_SPRITES_AND_LEVEL	= 0
 	BANK_MUSIC_AND_SOUND	= 1
 	BANK_CHR				= 1
+	BANK_TEXT_ENGINE		= 2
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
@@ -4194,6 +4196,9 @@ handle_main_input:
 	lda ctrlButtons
 	and #CONTROLLER_SELECT
 	beq @done_sel
+		lda lastCtrlButtons
+		and #CONTROLLER_SELECT
+		bne @done_sel
 		jsr do_dimensional_transfer
 	@done_sel:
 
@@ -5491,6 +5496,8 @@ menu_chr_data:
 
 .segment "BANK2"
 banktable
+
+.include "lib/text.asm"
 
 
 .segment "RODATA"

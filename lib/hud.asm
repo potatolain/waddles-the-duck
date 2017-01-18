@@ -65,4 +65,39 @@ update_hud_gem_count:
 	adc #GAME_TILE_0
 	sta PPU_DATA
 
-rts
+	rts
+
+; NOTE: This is used very rarely, so we cheat and put this all on one nametable. 
+; Any instance of chatter must be aligned with $2000 as a result.
+show_bottom_hud:
+	lda ppuCtrlBuffer
+	pha
+	and #%11111011
+	sta ppuCtrlBuffer
+
+	jsr disable_all
+	jsr vblank_wait
+	set_ppu_addr $2300
+	lda PPU_DATA ; 1 read to flush the data that's already in...
+	ldx #0
+	@loop_cache_original:
+		lda PPU_DATA
+		sta ANIMATED_TILE_CACHE, x
+		inx
+		cpx #0
+		bne @loop_cache_original
+	
+	bank #BANK_TEXT_ENGINE
+		jsr show_professor_text
+	bank #BANK_SPRITES_AND_LEVEL
+	
+	jsr draw_switchable_tiles ; Redraws all animated tiles to the cache, replacing the stuff we blew away above to restore the screen.
+	reset_ppu_scrolling
+
+	jsr vblank_wait
+	jsr enable_all
+
+	pla
+	sta ppuCtrlBuffer
+	
+	rts

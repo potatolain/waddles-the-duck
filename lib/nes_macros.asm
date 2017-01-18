@@ -159,8 +159,11 @@
 .endmacro
 
 .macro bank banknum
-	bank_temp banknum
+	pha
+	lda banknum
 	sta currentBank
+	pla
+	bank_temp banknum
 .endmacro
 
 .macro bank_restore
@@ -195,3 +198,36 @@
 	sta PPU_DATA
 
 .endmacro
+
+.macro write_ppu_text text ; Using the text on a regular screen, draw the given text to PPU_DATA character by character
+	.repeat .strlen(text), I
+		char .set .strat(text, I)
+		.if (char > $40 .and char < $5b) ; uppercase
+			char .set .strat(text, I) - $41 + GAME_TILE_A
+		.elseif (char >= 'a' .and char <= 'z') ; lowercase
+			char .set .strat(text, I) - $61 + GAME_TILE_A
+		.elseif (char >= '0' .and char <= '9') ; numbers (non-zero)
+			char .set .strat(text, I) - $30 + GAME_TILE_0
+		.elseif (char = '.')
+			char .set GAME_TILE_0 - 1
+		.elseif (char = ',')
+			char .set GAME_TILE_0 - 20 ; Comma's in a bit of weird spot...
+		.elseif (char = ':')
+			char .set GAME_TILE_0 - 3
+		.elseif (char = '/')
+			char .set GAME_TILE_0 - 2
+		.elseif (char = '!')
+			char .set GAME_TILE_0 - 21
+		.elseif (char = '?')
+			char .set GAME_TILE_0 - 5
+		.elseif (char = '-')
+			char .set GAME_TILE_0 - 15
+		.else; (char = $20) ; space
+			char .set GAME_TILE_0-13
+		.endif
+		
+		lda #char
+		sta PPU_DATA
+	.endrepeat
+.endmacro
+
