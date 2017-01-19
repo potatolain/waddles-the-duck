@@ -15,25 +15,25 @@ show_hud:
 		sta PPU_DATA
 	.endrepeat
 	store #TILE_BORDER_BR, PPU_DATA
+
+	set_ppu_addr $23c0
+	lda #%01010101
+	.repeat $10
+		sta PPU_DATA
+	.endrepeat
+	reset_ppu_scrolling
 	
 	rts
 
 update_hud_gem_count: 
 
-	set_ppu_addr $2041
-	lda #GAME_TILE_A+6 ; G
+	set_ppu_addr $2059
+
+	lda #GAME_TILE_0-22
 	sta PPU_DATA
-	lda #GAME_TILE_A+4 ; E
-	sta PPU_DATA
-	lda #GAME_TILE_A+12 ; M
-	sta PPU_DATA
-	lda #GAME_TILE_A+18 ; S
-	sta PPU_DATA
-	lda #GAME_TILE_0-3
-	STA PPU_DATA
-	lda #0
-	sta PPU_DATA
-	
+
+	jsr draw_hud_gem
+
 	lda gemCount ; left digit
 	.repeat 4
 		lsr
@@ -100,4 +100,15 @@ show_bottom_hud:
 	pla
 	sta ppuCtrlBuffer
 	
+	rts
+
+draw_hud_gem:
+	lda #194
+	sta HUD_GEM_SPRITE+3
+	lda #15
+	sta HUD_GEM_SPRITE
+	lda #0
+	sta HUD_GEM_SPRITE+2
+	lda #2
+	sta HUD_GEM_SPRITE+1
 	rts

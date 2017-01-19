@@ -137,6 +137,7 @@
 	SPRITE_ZERO						= $200
 	PLAYER_SPRITE					= $210
 	PLAYER_BOTTOM_SPRITE			= PLAYER_SPRITE+12
+	HUD_GEM_SPRITE 					= $22c
 	PLAYER_SPRITE_ID				= $c6
 	FIRST_VAR_SPRITE				= $230
 	VAR_SPRITE_DATA					= FIRST_VAR_SPRITE
@@ -5089,6 +5090,8 @@ do_pause_screen:
 	jsr load_palettes_for_pause
 	jsr clear_var_sprites
 	jsr hide_duck
+	lda #SPRITE_OFFSCREEN
+	sta HUD_GEM_SPRITE
 	jsr enable_all
 
 	store #SPRITE_PAUSE_LETTERS, VAR_SPRITE_DATA+1
@@ -5239,6 +5242,7 @@ do_pause_screen:
 		jsr load_palettes_for_dimension
 
 		jsr restore_duck
+		jsr draw_hud_gem
 		reset_ppu_scrolling
 		lda #0
 		jsr music_pause
