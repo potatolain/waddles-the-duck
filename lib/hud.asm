@@ -72,7 +72,8 @@ update_hud_gem_count:
 show_bottom_hud:
 	lda ppuCtrlBuffer
 	pha
-	and #%11111011
+	; Force vram increment to 0, nametable to 0
+	and #%11111000
 	sta ppuCtrlBuffer
 
 	jsr disable_all

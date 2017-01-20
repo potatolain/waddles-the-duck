@@ -117,6 +117,8 @@
 	spriteOffsetTmp:				.res 1
 	textPage:						.res 1
 	hasTalkedToMrDuck:				.res 1
+	preTextPpuCtrl:					.res 1
+	gameGemCountCache:				.res 2
 
 
 	CHAR_TABLE_START 				= $e0
@@ -213,6 +215,7 @@
 	BANK_MUSIC_AND_SOUND	= 1
 	BANK_CHR				= 1
 	BANK_TEXT_ENGINE		= 2
+	BANK_GEM_FUNCTIONS		= 2
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
@@ -346,13 +349,15 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 7
+	BASE_NUMBER_OF_LEVELS = 8
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
 	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS+1
+	LEVEL_8_ID = 8
 .else
 	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS
+	LEVEL_8_ID = 7
 .endif
 	
 .segment "STUB"
@@ -747,6 +752,13 @@ get_tile_at_position:
 	plxy
 	rts
 
+; Tricky method to write the gem count in level 8.
+override_gem_numbers_in_row:
+	bank_temp #BANK_GEM_FUNCTIONS
+		jsr banked_override_gem_numbers_in_row
+	bank_restore
+	rts
+
 
 load_current_line:
 	lda playerIsInScrollMargin
@@ -783,6 +795,8 @@ load_current_line:
 		cpy #16
 		
 		bne @loop
+
+	jsr override_gem_numbers_in_row
 
 	; The row **also** has sprites! Maybe!
 	ldx levelPosition
@@ -2744,12 +2758,13 @@ do_sprite_movement:
 			cmp #SPRITE_ANIMATION_BINARY
 			bne @not_binary
 				lda frameCounter
-				and #%00000100
+				and #%00001000
 				lsr
 				lsr
-				sta temp7
+				lsr
+				sta temp6
 				lda #0
-				sta temp0
+				sta temp7
 			@not_binary:
 			cmp #SPRITE_ANIMATION_LR
 			bne @not_lr
@@ -2784,6 +2799,11 @@ do_sprite_movement:
 				jsr draw_3x1_sprite_size
 				jmp @continue
 			@not_3x1:
+			cmp #SPRITE_SIZE_TELEPORTER
+			bne @not_tele
+				jsr draw_teleporter_sprite_size
+				jmp @continue
+			@not_tele:
 			cmp #SPRITE_SIZE_TINY
 			bne @not_tiny
 				jsr draw_tiny_sprite_size
@@ -3377,6 +3397,91 @@ draw_3x1_sprite_size:
 	ply
 	rts
 
+; x must be a sprite id, temp6 is animation, temp7 is direction
+; Teleporter gets its own 'size' due to its unique requirements around sprite show/hide
+draw_teleporter_sprite_size: 
+	phy
+	jsr get_var_sprite_data_offset_y
+
+	
+	lda temp1
+	sec
+	sbc temp2
+	cmp #SPRITE_X_CUTOFF
+	bcc @dont_kill_the_sprite
+		@kill_the_sprite:
+		lda #SPRITE_OFFSCREEN
+		sta VAR_SPRITE_DATA, y
+		sta VAR_SPRITE_DATA+4, y
+		sta VAR_SPRITE_DATA+8, y
+		sta VAR_SPRITE_DATA+12, y
+		ply
+		rts
+	@dont_kill_the_sprite:
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+	cmp currentDimension
+	bne @kill_the_sprite
+
+	lda temp1
+	sec
+	sbc temp2
+
+	sta VAR_SPRITE_DATA+3, y
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+7, y
+	clc
+	adc #8
+	sta VAR_SPRITE_DATA+11, y
+
+	
+	lda temp6
+	.repeat 4
+		asl
+	.endrepeat
+	sta temp6
+	lda temp7
+	clc
+	adc temp7 
+	adc temp7 ; Multiply by 3.
+	
+	adc temp6
+	sta temp6
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	clc
+	adc #8 ; You're half height; get on the floor; everybody do the dinosaur
+	sta VAR_SPRITE_DATA, y
+	sta VAR_SPRITE_DATA+4, y
+	sta VAR_SPRITE_DATA+8, y
+
+	lda #SPRITE_OFFSCREEN
+	sta VAR_SPRITE_DATA+12, y
+	
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_PALETTE, x
+	and #SPRITE_DATA_PALETTE_MASK
+	rol
+	rol
+	rol
+	and #%00000011
+	sta VAR_SPRITE_DATA+2, y
+	sta VAR_SPRITE_DATA+6, y
+	sta VAR_SPRITE_DATA+10, y
+	sta VAR_SPRITE_DATA+14, y
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TILE_ID, x
+	clc
+	adc temp6
+	sta VAR_SPRITE_DATA+1, y
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+5, y
+	clc
+	adc #1
+	sta VAR_SPRITE_DATA+9, y
+
+	ply
+	rts
 
 
 draw_default_sprite_size:
@@ -3463,6 +3568,8 @@ get_current_sprite_y:
 	cmp #SPRITE_SIZE_2X1
 	beq @half
 	cmp #SPRITE_SIZE_3X1
+	beq @half
+	cmp #SPRITE_SIZE_TELEPORTER
 	beq @half
 	cmp #SPRITE_SIZE_TINY
 	beq @quarter
@@ -3590,6 +3697,10 @@ do_sprite_collision:
 	bne @not_shark
 		jmp do_player_death
 	@not_shark:
+	cmp #SPRITE_TYPE_TELEPORT
+	bne @not_tele
+		jsr do_teleporter_collision
+	@not_tele:
 	cmp #SPRITE_TYPE_DIMENSIONER
 	bne @not_dimensioner
 		; This thing transports us between dimensions... mark it up.
@@ -3610,6 +3721,21 @@ do_sprite_collision:
 		jsr show_bottom_hud
 	@not_professor:
 
+	rts
+
+do_teleporter_collision:
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
+	cmp currentDimension
+	beq @yep_your_in
+		rts ; If this isn't meant for your dimension, go away...
+	@yep_your_in:
+		; Technically, we're going all abandon ship on our stack here.
+		; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
+		jsr do_end_of_level_teleporter_anim
+		ldx #$ff
+		txs
+		jsr do_next_level ; TODO: This needs to be smarter-er about whether to show the bad end, or good end.
+		jmp show_ready
 	rts
 
 ; Gets the position of a collectible. Give it: 
@@ -3820,42 +3946,12 @@ get_gem_update_data:
 	rts
 
 update_gem_count:
-	phxy
-	lda currentLevel
-	asl
-	asl
-	tay
-	lda #0
-	sta gemCount
-	.repeat 4
-		ldx #0
-		lda COLLECTIBLE_DATA, y
-		: ; No name loop label (No names for labels in this section because we're in a repeat, and we don't want names to collide)
-			asl ; (There's likely a smarter way to do this, but this works. If you see this and are facepalming at it, submit a PR to fix it!)
-			pha
-			lda gemCount
-			adc #0 ; We're really just using the value of the carry for each bit. asl drops it in.
-			sta gemCount
-			and #%00001111
-			cmp #$a
-			bne :+
-				; If we hit 10, bounce up, just like non-hex numbers. Just... drop the hexxy bits.
-				lda gemCount
-				clc
-				adc #6
-				sta gemCount
-			: ; No name end of section label 
-			
-			pla
-
-			inx
-			cpx #8
-			bne :--
-		iny
-	.endrepeat
-	plxy
+	bank_temp #BANK_GEM_FUNCTIONS
+	jsr banked_update_gem_count
+	bank_restore
 	rts
 
+; Not moved to separate bank because it uses data in another bank.
 update_total_gem_count:
 	store #0, totalGemCount
 	
@@ -3889,6 +3985,7 @@ update_total_gem_count:
 get_game_gem_count:
 	lda #0
 	sta temp1
+	sta temp2
 	ldx #0
 	@loop:
 		ldy #0
@@ -4671,6 +4768,28 @@ do_dimensional_transfer:
 	rts
 	@doit:
 
+	; Special case for end-of-days... 
+	lda warpDimensionB
+	cmp #DIMENSION_END_OF_DAYS
+	bne @normal
+		; It is 1) a one-way trip
+		lda currentDimension
+		cmp #DIMENSION_PLAIN
+		beq @continue_ending_days
+			@nope_you_fail:
+			rts 
+		@continue_ending_days:
+		; 2) Only available if you have all gems in the game.
+		jsr get_game_gem_total
+		lda gameGemCountCache
+		cmp tempc
+		bne @nope_you_fail
+		lda gameGemCountCache+1
+		cmp tempd
+		bne @nope_you_fail
+
+	@normal:
+
 	lda #SFX_WARP
 	ldx #SOUND_CHANNEL_PLAYER
 	jsr sfx_play
@@ -4895,10 +5014,32 @@ update_buffer_for_warp_zone:
 		; It's a warp! but is it ours?
 		lda currentDimension
 		cmp warpDimensionA
-		beq @its_definitely_a_warp
+		beq @its_probably_a_warp
 		cmp warpDimensionB
-		beq @its_definitely_a_warp
+		beq @its_probably_a_warp
 		jmp @restore_original_colors
+
+	@its_probably_a_warp:
+		; Little extra check to eliminate the end of days warps unless you meet the criteria
+		lda warpDimensionB
+		cmp #DIMENSION_END_OF_DAYS
+		bne @its_definitely_a_warp
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		beq @restore_original_colors
+
+		cmp #DIMENSION_PLAIN
+		bne @its_probably_a_warp
+		; Okay... you're in plain, this thing goes to end of days... do you meet the criteria?
+		jsr get_game_gem_total
+		lda gameGemCountCache
+		cmp tempc
+		bne @restore_original_colors
+		lda gameGemCountCache+1
+		cmp tempd
+		bne @restore_original_colors
+		jmp @its_definitely_a_warp
+		
 
 	@its_definitely_a_warp: 
 		; party time
@@ -5029,6 +5170,11 @@ show_level:
 	jsr disable_all
 	jsr vblank_wait
 	jsr update_gem_count
+	jsr get_game_gem_count
+	lda temp1
+	sta gameGemCountCache
+	lda temp2
+	sta gameGemCountCache+1
 
 	; Turn off 32 bit adding for addresses initially.
 	lda ppuCtrlBuffer
@@ -5329,6 +5475,81 @@ do_end_of_level_anim:
 		bne @loop
 
 	rts
+
+do_end_of_level_teleporter_anim:
+	
+	lda #SONG_LEVEL_END
+	phx
+	jsr music_play
+	plx
+	lda #0
+	sta playerYVelocity
+	sta playerVelocity
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	sec 
+	sbc #4 ; We wanna be on the thing, not overlapping it
+	sta PLAYER_SPRITE
+	sta PLAYER_SPRITE+4
+	sta PLAYER_SPRITE+8
+	clc
+	adc #8
+	sta PLAYER_SPRITE+12
+	sta PLAYER_SPRITE+16
+	sta PLAYER_SPRITE+20
+
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X, x
+	sec
+	sbc scrollX
+	clc
+	adc #4
+	and #%11110000
+	sta PLAYER_SPRITE+3
+	sta PLAYER_SPRITE+15
+	clc
+	adc #8
+	sta PLAYER_SPRITE+7
+	sta PLAYER_SPRITE+19
+	clc
+	adc #8
+	sta PLAYER_SPRITE+11
+	sta PLAYER_SPRITE+23
+
+	lda #PLAYER_SPRITE_ID
+	sta PLAYER_SPRITE+1
+	clc 
+	adc #1
+	sta PLAYER_SPRITE+5
+	adc #1
+	sta PLAYER_SPRITE+9
+
+	lda #PLAYER_SPRITE_ID+$10
+	sta PLAYER_SPRITE+13
+	adc #1
+	sta PLAYER_SPRITE+17
+	adc #1
+	sta PLAYER_SPRITE+21
+
+	ldx #0
+
+	@loop:
+		phx
+
+		jsr sound_update
+		jsr vblank_wait
+		jsr do_sprite0
+
+		; Do it twice, animating every other tile, to make timing code simpler.
+		jsr sound_update
+		jsr vblank_wait
+		jsr do_sprite0
+
+		plx
+		inx
+		cpx #END_OF_LEVEL_WAIT_TIME
+		bne @loop
+
+	rts
 	
 disable_all:
 	ldx #$00
@@ -5358,6 +5579,19 @@ vblank_wait:
 	
 .include "lib/controller.asm"
 .include "lib/hud.asm"
+
+; Little hack method you can throw somewhere to get your gem count up to the total in the game.
+; WARNING: This doesn't really do it legitimately - gems will still be in some later levels, and if you
+; grab them, you'll break stuff. Generally, don't use this. 
+; TODO: Remove this before shipping. Please?
+HACK_GIMME_ALL_GEMS:
+	lda #255
+	.repeat 20, I
+		sta COLLECTIBLE_DATA+I
+	.endrepeat
+	lda #1
+	sta COLLECTIBLE_DATA+21
+	rts
 	
 ;;; 
 ;;; Nmi handler
@@ -5445,6 +5679,10 @@ lvl7:
 	.include "levels/lvl7_meta.asm"
 	.include "levels/processed/lvl7_tiles.asm"
 	.include "levels/processed/lvl7_sprites.asm"
+lvl8:
+	.include "levels/lvl8_meta.asm"
+	.include "levels/processed/lvl8_tiles.asm"
+	.include "levels/processed/lvl8_sprites.asm"
 
 
 
@@ -5452,9 +5690,9 @@ leveldata_table:
 	.if DEBUGGING = 1 
 		.word lvldebug
 	.endif
-	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6, lvl7
+	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6, lvl7, lvl8
 
-GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT + LVL7_COLLECTIBLE_COUNT
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT + LVL7_COLLECTIBLE_COUNT + LVL8_COLLECTIBLE_COUNT
 
 
 
@@ -5513,6 +5751,10 @@ menu_chr_data:
 banktable
 
 .include "lib/text.asm"
+
+; Okay, this is messy. Plain and simple. Running up against the deadline, and I hit the limitation on the size of my kernel bank.
+; So... to avoid having to refactor, well, everything, I'm sticking a few things that are easily separated into bank 3.
+.include "lib/gem_data.asm"
 
 
 .segment "RODATA"

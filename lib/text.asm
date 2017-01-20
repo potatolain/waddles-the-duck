@@ -319,3 +319,39 @@ show_updated_text:
         write_ppu_text "                                "
 		rts
 
+
+
+; This creates an impressive number of commands due to the extreme simplicity/complexity of write_string
+; Moving this to a separate bank to free up a bit of space in the kernel
+load_title_text:
+	write_string "Waddles the Duck", $2067
+	write_string "NESDev 2016 Compo Entry", $20a4
+	
+	.if SHOW_VERSION_STRING = 1
+		set_ppu_addr $2320
+		ldx #$80
+		lda #$ff
+		@loop_clear: 
+			sta PPU_DATA
+			dex
+			cpx #$0
+			bne @loop_clear
+
+		write_string .sprintf("Version %04s Build %05d", VERSION, BUILD), $2321
+		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
+		write_string SPLASH_MESSAGE, $2361, $1e
+	.endif
+
+	.if DEBUGGING = 1
+		set_ppu_addr $2300
+		ldx #$20
+		lda #$ff
+		@loop_clear2:
+			sta PPU_DATA
+			dex
+			cpx #0
+			bne @loop_clear2
+		
+		write_string .sprintf("Debug mode enabled"), $2301
+	.endif
+rts
