@@ -41,6 +41,7 @@
 	sta PPU_ADDR
 	lda #<(location)
 	sta PPU_ADDR
+	lastchar .set '|'
 	.repeat .strlen(text), I
 		; This actually never fires properly. Wrapping needs to be fixed.
 		.if ((I .mod wrap) = (wrap))
@@ -88,7 +89,10 @@
 			char .set CHAR_SPACE
 		.endif
 		
-		lda #char
+		.if (char <> lastchar)
+			lda #char
+		.endif
+		lastchar .set char
 		sta PPU_DATA
 	.endrepeat 
 .endmacro
@@ -200,6 +204,7 @@
 .endmacro
 
 .macro write_ppu_text text ; Using the text on a regular screen, draw the given text to PPU_DATA character by character
+	lastchar .set '|'
 	.repeat .strlen(text), I
 		char .set .strat(text, I)
 		.if (char > $40 .and char < $5b) ; uppercase
@@ -228,7 +233,10 @@
 			char .set GAME_TILE_0-13
 		.endif
 		
-		lda #char
+		.if (char <> lastchar)
+			lda #char
+		.endif
+		lastchar .set char
 		sta PPU_DATA
 	.endrepeat
 .endmacro
