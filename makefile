@@ -26,7 +26,8 @@ VERSION=0.1a
 
 LEVELS=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_tiles.asm, $(wildcard levels/*.json)))
 SPRITES=$(patsubst levels/%, levels/processed/%, $(patsubst %.json, %_sprites.asm, $(wildcard levels/*.json)))
-GRAPHICS=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.chr, %.pkb, $(wildcard graphics/*.chr)))
+GRAPHICS=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.chr, %.chr.pkb, $(wildcard graphics/*.chr)))
+NAMETABLES=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.nam, %.nam.pkb, $(wildcard graphics/*.nam)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Hacky magic to read a random line from our file of splash messages.
@@ -41,7 +42,7 @@ else
 	UPLOADER=tools/uploader/upload.sh
 endif
 
-all: generate_constants sound_files convert_levels convert_sprites convert_graphics build 
+all: generate_constants sound_files convert_levels convert_sprites convert_graphics convert_nametables build 
 
 generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
@@ -78,8 +79,11 @@ levels/processed/%_sprites.asm: levels/%.json
 convert_levels: $(LEVELS)
 convert_sprites: $(SPRITES)
 convert_graphics: $(GRAPHICS)
+convert_nametables: $(NAMETABLES)
 
-graphics/processed/%.pkb: graphics/%.chr
+graphics/processed/%.chr.pkb: graphics/%.chr
+	$(PACKBITS) $< $@
+graphics/processed/%.nam.pkb: graphics/%.nam
 	$(PACKBITS) $< $@
 
 build: 

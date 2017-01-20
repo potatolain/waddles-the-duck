@@ -5741,10 +5741,10 @@ default_chr:
 	.incbin "graphics/map_tiles.chr"
 	
 default_sprite_chr:
-	.incbin "graphics/processed/sprites.pkb"
+	.incbin "graphics/processed/sprites.chr.pkb"
 
 menu_chr_data: 
-	.incbin "graphics/processed/title_tiles.pkb"
+	.incbin "graphics/processed/title_tiles.chr.pkb"
 
 
 .segment "BANK2"
