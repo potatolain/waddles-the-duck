@@ -204,7 +204,11 @@
 .endmacro
 
 .macro write_ppu_text text ; Using the text on a regular screen, draw the given text to PPU_DATA character by character
-	lastchar .set '|'
+
+	; With how frequently we use this, it seems to confuse ca65 with the number of named local labels. 
+	; As a result, we use unnamed labels.
+	jmp :++
+	:
 	.repeat .strlen(text), I
 		char .set .strat(text, I)
 		.if (char > $40 .and char < $5b) ; uppercase
@@ -228,16 +232,24 @@
 		.elseif (char = '-')
 			char .set GAME_TILE_0 - 18
 		.elseif (char = $27)
-			char .set GAME_TILE_0 - 22
+			char .set GAME_TILE_0 - 6
 		.else; (char = $20) ; space
 			char .set GAME_TILE_0-13
 		.endif
 		
-		.if (char <> lastchar)
-			lda #char
-		.endif
-		lastchar .set char
-		sta PPU_DATA
+		.byte char
 	.endrepeat
+
+	:
+	phx
+	ldx #0
+	:
+		lda :---, x
+		sta PPU_DATA
+		inx
+		cpx #.strlen(text)
+		bne :-
+	plx
+
 .endmacro
 

@@ -1,4 +1,5 @@
 .feature c_comments
+.linecont +
 .include "lib/nes_constants.asm"
 .include "lib/project_constants.asm"
 .include "lib/nes_macros.asm"

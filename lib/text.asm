@@ -118,9 +118,11 @@ show_updated_text:
         write_ppu_text " Prof "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Waddles, you've made it!        "
-        write_ppu_text "This teleporter can send you    "
-        write_ppu_text "back in time.                   "
+        write_ppu_text .concat( \
+			"Waddles, you've made it!        ", \
+        	"This teleporter can send you    ", \
+        	"back in time.                   "  \
+		)
         rts
     
     professor_text_1:
@@ -128,9 +130,11 @@ show_updated_text:
         ;write_ppu_text "Prof"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "It isn't the most precise,      "
-        write_ppu_text "but it will get you close to    "
-        write_ppu_text "your own time.                  "
+        write_ppu_text .concat( \
+			"It isn't the most precise,      ", \
+        	"but it will get you close to    ", \
+        	"your own time.                  "  \
+		)
 		rts
 
 	professor_text_2:
@@ -138,9 +142,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Close to my own time?           "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+		write_ppu_text .concat( \
+        	"Close to my own time?           ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_text_3:
@@ -148,9 +154,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Yes. It should have a margin    "
-        write_ppu_text "of error around... 50 years.    "
-        write_ppu_text "                                "
+		write_ppu_text .concat( \
+        	"Yes. It should have a margin    ", \
+        	"of error around... 50 years.    ", \
+        	"                                "  \
+		)
 		rts
 
     professor_text_4:
@@ -158,9 +166,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Is that as close as you can     "
-        write_ppu_text "get?                            "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"Is that as close as you can     ", \
+        	"get?                            ", \
+        	"                                "  \
+		)
 		rts
 
     professor_text_5:
@@ -168,9 +178,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "With more time and gems,        "
-        write_ppu_text "maybe I could get closer, but   "
-        write_ppu_text "it would take years.            "
+        write_ppu_text .concat( \ 
+			"With more time and gems,        ", \
+			"maybe I could get closer, but   ", \
+			"it would take years.            "  \
+		)
 		rts
 
     professor_text_6:
@@ -178,9 +190,11 @@ show_updated_text:
         ;write_ppu_text "Prof    "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Are you ready?                  "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"Are you ready?                  ", \
+        	"                                ", \
+        	"                                " \
+		)
 		rts
 
 	professor_text_final:
@@ -194,9 +208,11 @@ show_updated_text:
         write_ppu_text " Prof "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Waddles, you've made it!        "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"Waddles, you've made it!        ", \
+        	"                                ", \
+        	"                                "  \
+		)
         rts
     
     professor_eod_text_1:
@@ -204,9 +220,11 @@ show_updated_text:
         ;write_ppu_text "Prof"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "The panel upstairs can take     "
-        write_ppu_text "you to the exact date and time  "
-        write_ppu_text "you were taken from.            "
+        write_ppu_text .concat( \
+			"The panel upstairs can take     ", \
+        	"you to the exact date and time  ", \
+        	"you were taken from.            "  \
+		)
 		rts
 
 	professor_eod_text_2:
@@ -214,9 +232,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "That's amazing!                 "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"That's amazing!                 ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_3:
@@ -224,9 +244,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "There is a catch, however...    "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"There is a catch, however...    ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_4:
@@ -234,9 +256,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "When you go through, you will   "
-        write_ppu_text "lose your ability to travel     "
-        write_ppu_text "through dimensions.             "
+        write_ppu_text .concat( \
+			"When you go through, you will   ", \
+        	"lose your ability to travel     ", \
+        	"through dimensions.             "  \
+		)
 		rts
 
     professor_eod_text_5:
@@ -244,9 +268,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "The world around you may go a   "
-        write_ppu_text "bit crazy.                      "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"The world around you may go a   ", \
+        	"bit crazy.                      ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_6:
@@ -254,9 +280,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Try to get back to the place    "
-        write_ppu_text "in time you came from, even     "
-        write_ppu_text "if the path is unfamiliar.      "
+        write_ppu_text .concat( \
+			"Try to get back to the place    ", \
+        	"in time you came from, even     ", \
+        	"if the path is unfamiliar.      "  \
+		)
 		rts
 
     professor_eod_text_7:
@@ -264,9 +292,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "When you find it, you will be   "
-        write_ppu_text "teleported back to your own     "
-        write_ppu_text "timeline.                       "
+        write_ppu_text .concat( \
+			"When you find it, you will be   ", \
+        	"teleported back to your own     ", \
+        	"timeline.                       "  \
+		)
 		rts
 
     professor_eod_text_8:
@@ -274,9 +304,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "So I can see my family again?   "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"So I can see my family again?   ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_9:
@@ -284,9 +316,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Luck willing, yes.              "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"Luck willing, yes.              ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_10:
@@ -294,9 +328,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "That is all I need to hear.     "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"That is all I need to hear.     ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
     professor_eod_text_11:
@@ -304,9 +340,11 @@ show_updated_text:
         write_ppu_text " Waddles "
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "I am ready.	                    "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"I am ready.	                 ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
 	professor_eod_text_12:
@@ -314,9 +352,11 @@ show_updated_text:
         write_ppu_text " Prof -----"
 
         set_ppu_addr $2342 ; Second row, second char
-        write_ppu_text "Good luck, Waddles.             "
-        write_ppu_text "                                "
-        write_ppu_text "                                "
+        write_ppu_text .concat( \
+			"Good luck, Waddles.             ", \
+        	"                                ", \
+        	"                                "  \
+		)
 		rts
 
 
