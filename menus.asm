@@ -131,7 +131,7 @@ load_title:
 		.endmacro
 
 		; NOTE: We're depending on the return value of get_level_gem_count being in temp1 here.
-		.repeat NUMBER_OF_LEVELS, I
+		.repeat NUMBER_OF_REGULAR_LEVELS, I
 			.if I = 0 && DEBUGGING = 1
 				; Debugging level gets a special case, since we want level numbers to match with/without debugging.
 				write_string .sprintf("Level DD  "), $2146+I*$20
@@ -210,7 +210,7 @@ show_title:
 				and #CONTROLLER_DOWN
 				bne @no_down
 				lda temp5
-				cmp #NUMBER_OF_LEVELS-1
+				cmp #NUMBER_OF_REGULAR_LEVELS-1
 				bcs @no_down
 				inc temp5
 				lda #SFX_MENU
@@ -283,6 +283,7 @@ show_ready:
 
 
 game_end:
+	
 	; Clear out buttons in case you already hit start for some screwy reason.
 	lda #0
 	sta ctrlButtons
@@ -290,6 +291,17 @@ game_end:
 	sta scrollX
 	sta scrollY
 	jsr load_menu
+
+	bank #BANK_INTRO
+
+	lda currentDimension
+	cmp #DIMENSION_END_OF_DAYS
+	bne @bad_ending
+		jmp show_good_ending
+	@bad_ending:
+		jmp show_bad_ending
+
+/*
 	; Alignment test... quotes contain 30 spaces (assuming a 1 tile border)
 	; __________ "                              "
 	write_string "Congratulations!", $2047
@@ -327,3 +339,4 @@ game_end:
 
 	@go_reset:
 		jmp reset ; Welp, it was nice knowing you...
+		*/

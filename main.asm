@@ -288,6 +288,7 @@
 	SONG_LEVEL_END		= 9
 	SONG_INTRO			= 13
 	SONG_TITLE			= 2
+	SONG_BAD_ENDING		= 8
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -356,15 +357,20 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
 	SHOW_VERSION_STRING = 1
-	BASE_NUMBER_OF_LEVELS = 8
+	BASE_NUMBER_OF_LEVELS = 9
+	BASE_NUMBER_OF_REGULAR_LEVELS = 8
 
 ; Debugging level has to count if we're debugging, and thus included it.
 .if DEBUGGING = 1
 	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS+1
+	NUMBER_OF_REGULAR_LEVELS = BASE_NUMBER_OF_REGULAR_LEVELS+1
 	LEVEL_8_ID = 8
+	LEVEL_9_ID = 9
 .else
 	NUMBER_OF_LEVELS = BASE_NUMBER_OF_LEVELS
+	NUMBER_OF_REGULAR_LEVELS = BASE_NUMBER_OF_REGULAR_LEVELS
 	LEVEL_8_ID = 7
+	LEVEL_9_ID = 8
 .endif
 	
 .segment "STUB"
@@ -4305,6 +4311,11 @@ handle_main_input:
 				jsr do_next_level
 				jmp show_ready
 			@no_hax:
+			lda ctrlButtons
+			and #CONTROLLER_A
+			beq @no_hax2
+				jsr HACK_GIMME_ALL_GEMS
+			@no_hax2:
 		.endif
 		jsr do_pause_screen
 	@done_start:
@@ -5423,11 +5434,27 @@ do_pause_screen:
 do_next_level:
 	inc currentLevel
 	lda currentLevel
-	cmp #NUMBER_OF_LEVELS
+	cmp #NUMBER_OF_REGULAR_LEVELS
 	bne @just_go
 		store #1, GAME_BEATEN_BYTE
-		jsr game_end
+
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		beq @carry_on_my_wayward_son
+			; Oh, so... you hit level 9, but you're in the normal dimension. Well... sadly, that means you're
+			; gonna get a bad ending. 
+			jsr game_end
+		@carry_on_my_wayward_son:
+		; oh, you were in EOD? Guess you've got one more level to play. Carry on.
+
 	@just_go:
+	lda currentLevel
+	cmp #LEVEL_9_ID
+	bne @seriously_just_go
+		; Ah, you beat 9. Fine, have your lame "credits", and your silly "happy ending". I won't stop you.
+		; - flowey
+		jsr game_end
+	@seriously_just_go:
 	rts
 
 do_end_of_level_anim:
@@ -5791,6 +5818,10 @@ lvl8:
 	.include "levels/lvl8_meta.asm"
 	.include "levels/processed/lvl8_tiles.asm"
 	.include "levels/processed/lvl8_sprites.asm"
+lvl9:
+	.include "levels/lvl9_meta.asm"
+	.include "levels/processed/lvl9_tiles.asm"
+	.include "levels/processed/lvl9_sprites.asm"
 
 
 
@@ -5798,9 +5829,9 @@ leveldata_table:
 	.if DEBUGGING = 1 
 		.word lvldebug
 	.endif
-	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6, lvl7, lvl8
+	.word lvl1, lvl2, lvl3, lvl4, lvl5, lvl6, lvl7, lvl8, lvl9
 
-GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT + LVL7_COLLECTIBLE_COUNT + LVL8_COLLECTIBLE_COUNT
+GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COLLECTIBLE_COUNT + LVL3_COLLECTIBLE_COUNT + LVL4_COLLECTIBLE_COUNT + LVL5_COLLECTIBLE_COUNT + LVL6_COLLECTIBLE_COUNT + LVL7_COLLECTIBLE_COUNT + LVL8_COLLECTIBLE_COUNT + LVL9_COLLECTIBLE_COUNT
 
 
 
@@ -5836,6 +5867,7 @@ banktable
 
 .include "lib/text.asm"
 .include "lib/title.asm"
+.include "lib/ending.asm"
 
 
 ; Okay, this is messy. Plain and simple. Running up against the deadline, and I hit the limitation on the size of my kernel bank.

@@ -106,5 +106,4 @@ banked_override_gem_numbers_in_row:
 
 
 	@leave:
-	nop
 	rts
