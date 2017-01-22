@@ -121,6 +121,7 @@
 	preTextPpuCtrl:					.res 1
 	gameGemCountCache:				.res 2
 	currentBackgroundColorOverride:	.res 1
+	dimensionSwapTimer:				.res 1
 
 
 	CHAR_TABLE_START 				= $e1
@@ -197,7 +198,7 @@
 	TILE_ROW_ICE_AGE			= $8
 	TILE_ROW_AGGRESSIVE			= $4
 	TILE_ROW_AUTUMN				= $a
-	TILE_ROW_END_OF_DAYS		= $4
+	TILE_ROW_END_OF_DAYS		= $a
 
 
 	; TODO: The logic around this could probably be axed at this point - we just always scroll if you're not at the start/end of the level.
@@ -530,6 +531,7 @@ load_level:
 	sta playerXVelocityLockTime
 	sta playerYVelocityLockTime
 	sta hasTalkedToMrDuck
+	sta frameCounter ; Reset all timers when you start a level. Mainly important so level 9 behaves consistently.
 	lda #1
 	sta playerIsInScrollMargin
 	jsr seed_level_position_l
@@ -1604,7 +1606,11 @@ do_special_tile_stuff:
 	@fire:
 		lda currentDimension
 		cmp #DIMENSION_AGGRESSIVE
-		bne @done_fire
+		beq @fired
+		cmp #DIMENSION_END_OF_DAYS
+		beq @fired
+		jmp @done_fire
+		@fired:
 		; Again, you die here
 		jmp do_player_death
 	@done_fire:
@@ -1689,6 +1695,8 @@ do_collision_test:
 	beq @fire
 	cmp #DIMENSION_ICE_AGE
 	beq @ice_age
+	cmp #DIMENSION_END_OF_DAYS
+	beq @end_of_days
 	; By default, fallthrough to @default. Hits barren and normal. (And I guess end of days)
 
 
@@ -1771,6 +1779,16 @@ do_collision_test:
 		lda #1
 		sta isOnIce
 		rts
+
+	@end_of_days:
+		lda tempCollision
+		cmp #TILE_CLOUD
+		beq @no_collision
+		cmp #TILE_WATER_BENEATH
+		beq @special_tile_collision
+
+		jmp @default ;
+
 
 
 
@@ -2427,6 +2445,8 @@ do_sprite_movement:
 			beq @go_no_motion
 			cmp #SPRITE_TYPE_DIMENSIONER
 			beq @go_no_motion
+			cmp #SPRITE_TYPE_TELEPORT
+			beq @go_no_motion
 			cmp #SPRITE_TYPE_FIREBALL
 			bne @no_fireball
 				jsr do_fireball_movement
@@ -2858,6 +2878,8 @@ do_fireball_movement:
 	lda currentDimension
 	cmp #DIMENSION_AGGRESSIVE
 	beq @okay_doit
+	cmp #DIMENSION_END_OF_DAYS
+	beq @okay_doit
 		@make_sprite_goner:
 		; Oh? Well, ummm... this is awkward. I'll just go away then
 		lda #0
@@ -2910,6 +2932,8 @@ do_fireball_movement:
 do_shark_movement:
 	lda currentDimension
 	cmp #DIMENSION_BARREN
+	beq @okay_doit
+	cmp #DIMENSION_END_OF_DAYS
 	beq @okay_doit
 		@make_sprite_goner:
 		; Oh? Well, ummm... this is awkward. I'll just go away then
@@ -3432,9 +3456,22 @@ draw_teleporter_sprite_size:
 		rts
 	@dont_kill_the_sprite:
 
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
-	cmp currentDimension
-	bne @kill_the_sprite
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	and #SPRITE_DATA_TYPE_MASK
+	cmp #SPRITE_TYPE_TELEPORT
+	bne @eod_teleporter
+		; We're in plain. Are you?
+		lda currentDimension
+		cmp #DIMENSION_PLAIN
+		bne @kill_the_sprite
+		jmp @well_just_keep_it
+	@eod_teleporter:
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		bne @kill_the_sprite
+		;jmp @well_just_keep_it  ; intentional fallthrough
+
+	@well_just_keep_it:
 
 	lda temp1
 	sec
@@ -3501,13 +3538,15 @@ draw_default_sprite_size:
 	phy
 	jsr get_var_sprite_data_offset_y
 
-
+	lda #0
+	sta scratch1
 	lda temp1
 	sec
 	sbc temp2
 
 	cmp #SPRITE_X_CUTOFF
 	bcc @dont_kill_the_sprite
+		@kill_the_sprite:
 		lda #SPRITE_OFFSCREEN
 		sta VAR_SPRITE_DATA, y
 		sta VAR_SPRITE_DATA+4, y
@@ -3516,7 +3555,24 @@ draw_default_sprite_size:
 		ply
 		rts
 	@dont_kill_the_sprite:
-
+	pha
+	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_TYPE, x
+	and #SPRITE_DATA_TYPE_MASK
+	cmp #SPRITE_TYPE_GRABBER
+	bne @not_grabber
+		; Grabbers don't show up unless you're in DIM_END_OF_DAYS
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		beq @oh_yeah_its_a_grabber ; you are allowed
+		; Okay its a grabber... clean up our mess...
+		pla
+		jmp @kill_the_sprite ; and go away
+		@oh_yeah_its_a_grabber:
+		; It *is* a grabber... these need to float a little bit, so let's add to their y position.
+		lda #6
+		sta scratch1
+	@not_grabber:
+	pla
 	sta VAR_SPRITE_DATA+3, y
 	sta VAR_SPRITE_DATA+11, y
 	clc
@@ -3537,6 +3593,8 @@ draw_default_sprite_size:
 	sta temp6
 
 	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_Y, x
+	sec
+	sbc scratch1
 	sta VAR_SPRITE_DATA, y
 	sta VAR_SPRITE_DATA+4, y
 	clc
@@ -3702,6 +3760,13 @@ do_sprite_collision:
 	bne @not_invuln
 		jmp do_player_death
 	@not_invuln:
+	cmp #SPRITE_TYPE_GRABBER
+	bne @not_grabber
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		bne @not_grabber
+		jmp do_player_death
+	@not_grabber:
 	cmp #SPRITE_TYPE_FIREBALL
 	bne @not_fireball
 		jmp do_player_death
@@ -3712,8 +3777,18 @@ do_sprite_collision:
 	@not_shark:
 	cmp #SPRITE_TYPE_TELEPORT
 	bne @not_tele
+		lda currentDimension
+		cmp #DIMENSION_PLAIN
+		bne @not_tele
 		jsr do_teleporter_collision
 	@not_tele:
+	cmp #SPRITE_TYPE_TELEPORT_2
+	bne @not_tele_2
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		bne @not_tele_2
+		jsr do_teleporter_collision
+	@not_tele_2:
 	cmp #SPRITE_TYPE_DIMENSIONER
 	bne @not_dimensioner
 		; This thing transports us between dimensions... mark it up.
@@ -3737,18 +3812,13 @@ do_sprite_collision:
 	rts
 
 do_teleporter_collision:
-	lda EXTENDED_SPRITE_DATA+SPRITE_DATA_EXTRA, x
-	cmp currentDimension
-	beq @yep_your_in
-		rts ; If this isn't meant for your dimension, go away...
-	@yep_your_in:
-		; Technically, we're going all abandon ship on our stack here.
-		; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
-		jsr do_end_of_level_teleporter_anim
-		ldx #$ff
-		txs
-		jsr do_next_level ; TODO: This needs to be smarter-er about whether to show the bad end, or good end.
-		jmp show_ready
+	; Technically, we're going all abandon ship on our stack here.
+	; Trying to accomodate for that by setting the stack pointer back down to $ff, where it starts.
+	jsr do_end_of_level_teleporter_anim
+	ldx #$ff
+	txs
+	jsr do_next_level ; TODO: This needs to be smarter-er about whether to show the bad end, or good end.
+	jmp show_ready
 	rts
 
 ; Gets the position of a collectible. Give it: 
@@ -4326,7 +4396,11 @@ handle_main_input:
 		lda lastCtrlButtons
 		and #CONTROLLER_SELECT
 		bne @done_sel
-		jsr do_dimensional_transfer
+		lda currentLevel
+		cmp #LEVEL_9_ID
+		beq @not_allowed
+			jsr do_dimensional_transfer
+		@not_allowed:
 	@done_sel:
 
 	rts
@@ -4816,6 +4890,8 @@ do_dimensional_transfer:
 		bne @nope_you_fail
 
 	@normal:
+	; Fallthrough - this entrypoint allows us to skip all of the checks above, and just force a dimension change. Used in level 9
+do_dimensional_transfer_unsafe:
 
 	lda #SFX_WARP
 	ldx #SOUND_CHANNEL_PLAYER
@@ -4972,6 +5048,7 @@ main_loop:
 	jsr test_sprite_collision
 	jsr update_buffer_for_warp_zone
 	jsr sound_update
+	jsr level_9_dimension_transfer
 
 	lda #0
 	sta tempf ; Keep track of what to skip....
@@ -5166,9 +5243,13 @@ animate_fire_tiles:
 
 clear_sprites:
 	ldx #0
-	lda #SPRITE_OFFSCREEN
 	@loop:
+		lda #SPRITE_OFFSCREEN
 		sta SPRITE_DATA, x
+		lda #0
+		sta SPRITE_DATA+1, x
+		sta SPRITE_DATA+2, x
+		sta SPRITE_DATA+3, x
 		inx
 		inx
 		inx
@@ -5449,7 +5530,7 @@ do_next_level:
 
 	@just_go:
 	lda currentLevel
-	cmp #LEVEL_9_ID
+	cmp #LEVEL_9_ID+1
 	bne @seriously_just_go
 		; Ah, you beat 9. Fine, have your lame "credits", and your silly "happy ending". I won't stop you.
 		; - flowey
@@ -5657,6 +5738,63 @@ do_end_of_level_teleporter_anim:
 			jmp @loop
 		@get_out:
 
+	rts
+
+level_9_dimension_transfer:
+	lda currentLevel
+	cmp #LEVEL_9_ID
+	beq @doit
+		rts
+	@doit:
+	lda frameCounter
+	cmp #0
+	beq @its_time_i_think
+		rts
+	@its_time_i_think:
+	inc dimensionSwapTimer
+	lda dimensionSwapTimer
+	and #%00000001
+	cmp #1
+	beq @it_is_time
+		rts
+	@it_is_time:
+
+	; Alright, time to swap dimensions on you manually...
+	lda currentDimension
+	cmp #DIMENSION_PLAIN
+	bne @not_plain
+		lda #DIMENSION_ICE_AGE
+		jmp @dimension_found
+	@not_plain:
+	cmp #DIMENSION_ICE_AGE
+	bne @not_ice
+		lda #DIMENSION_BARREN
+		jmp @dimension_found
+	@not_ice:
+	cmp #DIMENSION_BARREN
+	bne @not_barren
+		lda #DIMENSION_AGGRESSIVE
+		jmp @dimension_found
+	@not_barren:
+	cmp #DIMENSION_AGGRESSIVE
+	bne @not_aggressive
+		lda #DIMENSION_END_OF_DAYS
+		jmp @dimension_found
+	@not_aggressive:
+	cmp #DIMENSION_END_OF_DAYS
+	bne @confused
+		lda #DIMENSION_PLAIN
+		jmp @dimension_found
+	@confused:
+
+	@dimension_found:
+		sta warpDimensionB
+		lda currentDimension
+		sta warpDimensionA
+		jsr do_dimensional_transfer_unsafe
+		lda #DIMENSION_INVALID
+		sta warpDimensionA
+		sta warpDimensionB
 	rts
 	
 disable_all:

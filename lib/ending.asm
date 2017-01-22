@@ -273,18 +273,18 @@ ending_sprites_4:
 	.scope ENDING_SPRITE_1
 		DX1 = 60
 		DY1 = 48
-		.byte DY1, $c6, 0, DX1, DY1, $c7, 0, DX1+8, DY1, $c8, 0, DX1+16
-		.byte DY1+8, $d6, 0, DX1, DY1+8, $d7, 0, DX1+8, DY1+8, $d8, 0, DX1+16
+		.byte DY1, $c0, 0, DX1, DY1, $c1, 0, DX1+8, DY1, $c2, 0, DX1+16
+		.byte DY1+8, $d0, 0, DX1, DY1+8, $d1, 0, DX1+8, DY1+8, $d2, 0, DX1+16
 		
 		DX2 = 90
 		DY2 = 38
-		.byte DY2, $c8, $40, DX2, DY2, $c7, $40, DX2+8, DY2, $c6, $40, DX2+16
-		.byte DY2+8, $d8, $40, DX2, DY2+8, $d7, $40, DX2+8, DY2+8, $d6, $40, DX2+16
+		.byte DY2, $c2, $40, DX2, DY2, $c1, $40, DX2+8, DY2, $c0, $40, DX2+16
+		.byte DY2+8, $d2, $40, DX2, DY2+8, $d1, $40, DX2+8, DY2+8, $d0, $40, DX2+16
 
 		DX3 = 90
 		DY3 = 68
-		.byte DY3, $c8, $40, DX3, DY3, $c7, $40, DX3+8, DY3, $c6, $40, DX3+16
-		.byte DY3+8, $d8, $40, DX3, DY3+8, $d7, $40, DX3+8, DY3+8, $d6, $40, DX3+16
+		.byte DY3, $c2, $40, DX3, DY3, $c1, $40, DX3+8, DY3, $c0, $40, DX3+16
+		.byte DY3+8, $d2, $40, DX3, DY3+8, $d1, $40, DX3+8, DY3+8, $d0, $40, DX3+16
 		.byte $ff
 
 	.endscope
@@ -292,8 +292,8 @@ ending_sprites_5:
 	.scope ENDING_SPRITE_5
 		DX1 = 100
 		DY1 = 48
-		.byte DY1, $c6, 0, DX1, DY1, $c7, 0, DX1+8, DY1, $c8, 0, DX1+16
-		.byte DY1+8, $d6, 0, DX1, DY1+8, $d7, 0, DX1+8, DY1+8, $d8, 0, DX1+16
+		.byte DY1, $c0, 0, DX1, DY1, $c1, 0, DX1+8, DY1, $c2, 0, DX1+16
+		.byte DY1+8, $d0, 0, DX1, DY1+8, $d1, 0, DX1+8, DY1+8, $d2, 0, DX1+16
 		.byte $ff
 	.endscope
 
