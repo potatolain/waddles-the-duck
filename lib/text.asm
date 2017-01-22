@@ -365,8 +365,10 @@ show_updated_text:
 ; This creates an impressive number of commands due to the extreme simplicity/complexity of write_string
 ; Moving this to a separate bank to free up a bit of space in the kernel
 load_title_text:
-	write_string "Waddles the Duck", $2067
-	write_string "NESDev 2016 Compo Entry", $20a4
+	set_ppu_addr $2000
+	store #<(title_screen_base), tempAddr
+	store #>(title_screen_base), tempAddr+1
+	jsr PKB_unpackblk
 	
 	.if SHOW_VERSION_STRING = 1
 		set_ppu_addr $2320
@@ -395,4 +397,7 @@ load_title_text:
 		
 		write_string .sprintf("Debug mode enabled"), $2301
 	.endif
-rts
+	rts
+
+title_screen_base:
+	.incbin "graphics/processed/title_screen.nam.pkb"

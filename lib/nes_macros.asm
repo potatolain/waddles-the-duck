@@ -89,6 +89,8 @@
 			char .set NUM_SYM_TABLE_START+$f
 		.elseif (char = 34) ; Double quote
 			char .set NUM_SYM_TABLE_START+$d
+		.elseif (char = '-')
+			char .set NUM_SYM_TABLE_START-7
 		.elseif (char = '`') ; Heart
 			char .set $ce
 		.else; (char = $20) ; space
