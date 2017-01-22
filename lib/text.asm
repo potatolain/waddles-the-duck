@@ -63,7 +63,8 @@ show_professor_text:
         jsr disable_all
         jsr vblank_wait
         jsr show_updated_text
-		reset_ppu_scrolling
+		reset_ppu_scrolling_and_ctrl
+		jsr vblank_wait
         jsr enable_all
         lda textPage
         cmp #255
@@ -370,7 +371,7 @@ load_title_text:
 	.if SHOW_VERSION_STRING = 1
 		set_ppu_addr $2320
 		ldx #$80
-		lda #$ff
+		lda #CHAR_SPACE
 		@loop_clear: 
 			sta PPU_DATA
 			dex
@@ -385,7 +386,7 @@ load_title_text:
 	.if DEBUGGING = 1
 		set_ppu_addr $2300
 		ldx #$20
-		lda #$ff
+		lda #CHAR_SPACE
 		@loop_clear2:
 			sta PPU_DATA
 			dex

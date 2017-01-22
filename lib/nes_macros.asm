@@ -11,8 +11,14 @@
 	lda PPU_STATUS
 	store scrollX, PPU_SCROLL
 	store scrollY, PPU_SCROLL
-
 .endmacro
+
+.macro reset_ppu_scrolling_and_ctrl
+	reset_ppu_scrolling
+	lda ppuCtrlBuffer
+	sta PPU_CTRL
+.endmacro
+
 
 .macro store_ppu_data aa, bb, cc, dd, ee, ff, gg, hh, ii, jj, kk, ll, mm, nn, oo, pp, qq, rr, ss, tt, uu, vv, ww, xx, yy, zz
 	.ifblank aa
@@ -253,3 +259,45 @@
 
 .endmacro
 
+
+.macro beq16 num, var, location
+	lda #<(num)
+	cmp var
+	beq location
+	lda #>(num)
+	cmp var+1
+	beq location
+.endmacro
+
+.macro bne16 num, var, location
+	lda #<(num)
+	cmp var
+	bne location
+	lda #>(num)
+	cmp var+1
+	bne location
+.endmacro
+
+.macro bcc16 num, var, location
+	.local @bigger
+	lda #>(num)
+	cmp var+1
+	bcc location
+	bcs @bigger
+	lda #<(num)
+	cmp var
+	bcc location
+	@bigger:
+.endmacro
+
+.macro bcs16 num, var, location
+	.local @smaller
+	lda #>(num)
+	cmp var+1
+	bcs location
+	bcc @smaller
+	lda #<(num)
+	cmp var
+	bcs location
+	@smaller:
+.endmacro

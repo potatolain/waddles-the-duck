@@ -79,6 +79,9 @@ load_menu:
 load_title:
 	jsr load_menu
 
+	lda #SONG_TITLE
+	jsr music_play
+
 	bank_temp #BANK_TEXT_ENGINE
 		jsr load_title_text
 	bank_restore
@@ -96,11 +99,11 @@ load_title:
 		lda temp1
 		draw_current_num
 
-		lda #$ff
+		lda #CHAR_SPACE
 		sta PPU_DATA
 		lda #NUM_SYM_TABLE_START+$b
 		sta PPU_DATA
-		lda #$ff
+		lda #CHAR_SPACE
 		sta PPU_DATA 
 
 
@@ -116,11 +119,11 @@ load_title:
 
 			lda baseCount
 			draw_current_num
-			lda #$ff
+			lda #CHAR_SPACE
 			sta PPU_DATA
 			lda #NUM_SYM_TABLE_START+$b
 			sta PPU_DATA
-			lda #$ff
+			lda #CHAR_SPACE
 			sta PPU_DATA
 			lda #BINARY_TOTAL
 			draw_current_num
@@ -157,6 +160,11 @@ load_title:
 	rts
 
 show_title: 
+	jsr load_menu
+	bank #BANK_INTRO
+		jsr show_intro
+	bank #BANK_SPRITES_AND_LEVEL
+
 	jsr load_title
 	lda #0
 	sta temp5 ; Cursor offset if you have level select enabled.
@@ -221,6 +229,8 @@ show_title:
 			sta VAR_SPRITE_DATA
 			lda #TITLE_CURSOR_X_OFFSET
 			sta VAR_SPRITE_DATA+3
+			lda #0
+			sta VAR_SPRITE_DATA+2
 		@no_level_select:
 
 		jmp @loopa

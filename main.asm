@@ -120,11 +120,12 @@
 	hasTalkedToMrDuck:				.res 1
 	preTextPpuCtrl:					.res 1
 	gameGemCountCache:				.res 2
+	currentBackgroundColorOverride:	.res 1
 
 
-	CHAR_TABLE_START 				= $e0
+	CHAR_TABLE_START 				= $e1
 	NUM_SYM_TABLE_START	 			= $d0
-	CHAR_SPACE						= $ff
+	CHAR_SPACE						= $e0
 	COLLECTIBLE_DATA				= $420
 	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
 	MAGICAL_BYTE					= $4ff
@@ -217,6 +218,7 @@
 	BANK_CHR				= 1
 	BANK_TEXT_ENGINE		= 2
 	BANK_GEM_FUNCTIONS		= 2
+	BANK_INTRO				= 2
 	
 	LAST_WALKABLE_SPRITE	= 0
 	FIRST_SOLID_SPRITE		= LAST_WALKABLE_SPRITE+1
@@ -256,6 +258,8 @@
 	DEATH_HOP_TIME			= 6
 	DEATH_SONG_TIME			= 128
 
+	MENU_PALETTE_ID			= 7
+
 	
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Sound Effect ids
@@ -282,6 +286,8 @@
 	SONG_EOD			= 12
 	SONG_DEATH			= 3
 	SONG_LEVEL_END		= 9
+	SONG_INTRO			= 13
+	SONG_TITLE			= 2
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -4368,6 +4374,8 @@ do_sprite0:
 	rts
 
 seed_palette:
+	lda #$ff
+	sta currentBackgroundColorOverride
 	lda currentDimension
 	cmp #DIMENSION_AGGRESSIVE
 	beq @aggressive
@@ -4578,6 +4586,13 @@ do_fade_anim:
 
 		cpy #0
 		bne @inner_loop_sprites
+
+	lda currentBackgroundColorOverride
+	cmp #$ff
+	beq @no_override
+		lda currentBackgroundColorOverride
+		sta PPU_DATA
+	@no_override:
 	rts
 
 ; Quick method to convert accumulator as a dimension id into a row number to start drawing files into the variable tile row.
@@ -5534,10 +5549,73 @@ do_end_of_level_teleporter_anim:
 	ldx #0
 
 	@loop:
+		stx temp0
 		phx
 
 		jsr sound_update
+
+		lda #END_OF_LEVEL_WAIT_TIME
+		sec
+		sbc temp0
+		bcc @no_decrease
+		sta temp0
+		cmp #144
+		bcs @no_decrease
+		cmp #113
+		bcc @black
+			lda #144
+			sec
+			sbc temp0
+			lsr
+			lsr
+			lsr
+			and #%00000011
+			asl
+			asl
+			asl
+			asl
+			sta temp0
+			; Force 1-byte increment, instead of 32
+			lda ppuCtrlBuffer
+			and #%11111011
+			sta ppuCtrlBuffer
+			jsr do_fade_anim
+			; Restore
+			lda ppuCtrlBuffer
+			ora #%00000100
+			sta ppuCtrlBuffer
+			reset_ppu_scrolling
+			jmp @after_vbl
+		@black: 
+			phx
+			ldx #0
+			; Force 1-byte increment, instead of 32
+			lda ppuCtrlBuffer
+			and #%11111011
+			sta ppuCtrlBuffer
+
+			jsr vblank_wait
+
+			set_ppu_addr $3f00
+			lda #$0f
+			@loop_black_pal:
+				sta PPU_DATA
+				inx
+				cpx #32
+				bne @loop_black_pal
+			
+			; Restore
+			lda ppuCtrlBuffer
+			ora #%00000100
+			sta ppuCtrlBuffer
+			reset_ppu_scrolling
+
+			plx
+			jmp @after_vbl
+		@no_decrease:
 		jsr vblank_wait
+		@after_vbl:
+
 		jsr do_sprite0
 
 		; Do it twice, animating every other tile, to make timing code simpler.
@@ -5548,7 +5626,9 @@ do_end_of_level_teleporter_anim:
 		plx
 		inx
 		cpx #END_OF_LEVEL_WAIT_TIME
-		bne @loop
+		beq @get_out
+			jmp @loop
+		@get_out:
 
 	rts
 	
@@ -5639,6 +5719,33 @@ nmi:
 
 	.include "lib/unpkb.asm"
 	
+; Putting palettes in bank 0 because we access this from a few other banks.
+
+default_palettes: 
+	; Normal
+	.incbin "graphics/default.pal"
+	; fire-ized
+fire_palettes:
+	.incbin "graphics/fire.pal"
+ice_palettes:
+	.incbin "graphics/ice.pal"
+dark_palettes:
+	.incbin "graphics/dark.pal"
+desert_palettes:
+	.incbin "graphics/desert.pal"
+
+
+default_sprite_palettes: ; Drawn at same time as above.
+	; 0) duck. 1) turtle
+	.incbin "graphics/default_sprite.pal"
+dark_sprite_palettes:
+	.incbin "graphics/dark_sprite.pal"
+
+menu_palettes: 
+	.incbin "graphics/menu.pal" ; Chr
+	.incbin "graphics/menu.pal" ; Sprite
+
+
 .segment "BANK0"
 banktable
 
@@ -5698,30 +5805,6 @@ GAME_GEM_TOTAL = LVL_DEBUG_COLLECTIBLE_COUNT + LVL1_COLLECTIBLE_COUNT + LVL2_COL
 
 
 	
-default_palettes: 
-	; Normal
-	.incbin "graphics/default.pal"
-	; fire-ized
-fire_palettes:
-	.incbin "graphics/fire.pal"
-ice_palettes:
-	.incbin "graphics/ice.pal"
-dark_palettes:
-	.incbin "graphics/dark.pal"
-desert_palettes:
-	.incbin "graphics/desert.pal"
-
-
-default_sprite_palettes: ; Drawn at same time as above.
-	; 0) duck. 1) turtle
-	.incbin "graphics/default_sprite.pal"
-dark_sprite_palettes:
-	.incbin "graphics/dark_sprite.pal"
-
-menu_palettes: 
-	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
-	.byte $0f,$00,$38,$30,$0f,$01,$21,$31,$0f,$06,$16,$26,$0f,$09,$19,$29
-
 	
 .segment "CHUNK"
 	; Nothing here. Just reserving it...
@@ -5752,10 +5835,13 @@ menu_chr_data:
 banktable
 
 .include "lib/text.asm"
+.include "lib/title.asm"
+
 
 ; Okay, this is messy. Plain and simple. Running up against the deadline, and I hit the limitation on the size of my kernel bank.
 ; So... to avoid having to refactor, well, everything, I'm sticking a few things that are easily separated into bank 3.
 .include "lib/gem_data.asm"
+
 
 
 .segment "RODATA"
