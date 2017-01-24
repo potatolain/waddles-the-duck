@@ -298,8 +298,8 @@ game_end:
 
 	bank #BANK_INTRO
 
-	lda currentDimension
-	cmp #DIMENSION_END_OF_DAYS
+	lda currentLevel
+	cmp #LEVEL_9_ID+1
 	bne @bad_ending
 		jmp show_good_ending
 	@bad_ending:

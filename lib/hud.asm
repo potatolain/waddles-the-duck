@@ -18,7 +18,7 @@ show_hud:
 
 	set_ppu_addr $23c0
 	lda #%01010101
-	.repeat $10
+	.repeat $8
 		sta PPU_DATA
 	.endrepeat
 	reset_ppu_scrolling

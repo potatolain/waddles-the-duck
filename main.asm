@@ -122,6 +122,7 @@
 	gameGemCountCache:				.res 2
 	currentBackgroundColorOverride:	.res 1
 	dimensionSwapTimer:				.res 1
+	hasHitLastLevelWarpThing:		.res 1 ; Candidate for best variable name ever... if this is non-zero, we won't flip dimensions in level 9 anymore.
 
 
 	CHAR_TABLE_START 				= $e1
@@ -532,6 +533,8 @@ load_level:
 	sta playerYVelocityLockTime
 	sta hasTalkedToMrDuck
 	sta frameCounter ; Reset all timers when you start a level. Mainly important so level 9 behaves consistently.
+	sta dimensionSwapTimer
+	sta hasHitLastLevelWarpThing
 	lda #1
 	sta playerIsInScrollMargin
 	jsr seed_level_position_l
@@ -5744,8 +5747,53 @@ level_9_dimension_transfer:
 	lda currentLevel
 	cmp #LEVEL_9_ID
 	beq @doit
+		@escape:
 		rts
 	@doit:
+
+
+	lda levelPosition
+	cmp #250
+	bcs @below_all ; There's a bug where we have negative level positions... work around that.
+	cmp #193
+	bcc @below_all
+	lda #1
+	sta hasHitLastLevelWarpThing
+	lda levelPosition
+	cmp #234
+	bcs @go_to_normal
+		; Welp, time for you to go to the dark, dark dimension...
+		lda currentDimension
+		cmp #DIMENSION_END_OF_DAYS
+		beq @escape
+		sta warpDimensionA
+		lda #DIMENSION_END_OF_DAYS
+		sta warpDimensionB
+		jsr do_dimensional_transfer_unsafe
+		lda #DIMENSION_INVALID
+		sta warpDimensionA
+		sta warpDimensionB
+		jmp @escape
+
+	@go_to_normal:
+		lda currentDimension
+		cmp #DIMENSION_PLAIN
+		beq @escape
+		sta warpDimensionA
+		lda #DIMENSION_PLAIN
+		sta warpDimensionB
+		jsr do_dimensional_transfer_unsafe
+		lda #DIMENSION_INVALID
+		sta warpDimensionA
+		sta warpDimensionB
+		jmp @escape
+
+	@below_all:
+
+	lda hasHitLastLevelWarpThing
+	cmp #0
+	bne @escape
+
 	lda frameCounter
 	cmp #0
 	beq @its_time_i_think

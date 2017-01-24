@@ -38,6 +38,14 @@
 
 
 show_good_ending: 
+	draw_screen good_ending_0
+	reset_ppu_scrolling_and_ctrl
+	lda #0
+	jsr music_pause
+	jsr vblank_wait
+	jsr enable_all
+	@while_1:
+		jmp @while_1
 	jmp reset ; Welp, it was nice knowing you...
 
 show_bad_ending:
@@ -282,7 +290,7 @@ ending_sprites_4:
 		.byte DY2+8, $d2, $40, DX2, DY2+8, $d1, $40, DX2+8, DY2+8, $d0, $40, DX2+16
 
 		DX3 = 90
-		DY3 = 68
+		DY3 = 62
 		.byte DY3, $c2, $40, DX3, DY3, $c1, $40, DX3+8, DY3, $c0, $40, DX3+16
 		.byte DY3+8, $d2, $40, DX3, DY3+8, $d1, $40, DX3+8, DY3+8, $d0, $40, DX3+16
 		.byte $ff
@@ -317,3 +325,6 @@ the_end_tile:
 	.incbin "graphics/processed/the_end.nam.pkb"
 the_end_question_tile:
 	.incbin "graphics/processed/the_end_question.nam.pkb"
+
+good_ending_0:
+	.incbin "graphics/processed/good_ending_0.nam.pkb"
