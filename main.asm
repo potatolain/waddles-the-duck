@@ -5550,9 +5550,15 @@ do_end_of_level_anim:
 	lda #PLAYER_VELOCITY_NORMAL*2
 	sta playerVelocity
 
+	; Force us back to 1 bit adding instead of 32
+	lda ppuCtrlBuffer
+	and #%11111011
+	sta ppuCtrlBuffer
+
 	ldx #0
 
 	@loop:
+		stx tempf
 		phx
 		lda PLAYER_SPRITE
 		cmp #SPRITE_OFFSCREEN ; If you get yanked offscreen you'll probably get killed... let's avoid that.
@@ -5592,15 +5598,34 @@ do_end_of_level_anim:
 		jsr vblank_wait
 		jsr do_sprite0
 		jsr do_player_anim
+
+		lda tempf
+		cmp #END_OF_LEVEL_WAIT_TIME-$12
+		bcc @no_anim
+			sec
+			sbc #END_OF_LEVEL_WAIT_TIME-$12
+			and #%11111100
+			asl
+			asl
+			sta temp0
+			jsr do_fade_anim
+			jsr do_sprite0
+			reset_ppu_scrolling_and_ctrl
+			jmp @first_round_only
+		@no_anim:
+		
 		; Do it twice, animating every other tile, to make timing code simpler.
 		jsr sound_update
 		jsr vblank_wait
 		jsr do_sprite0
+		@first_round_only:
 
 		plx
 		inx
 		cpx #END_OF_LEVEL_WAIT_TIME
-		bne @loop
+		beq @unloop
+			jmp @loop
+		@unloop:
 
 	rts
 

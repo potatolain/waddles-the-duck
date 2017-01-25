@@ -253,7 +253,8 @@ load_ready:
 
 	write_string "Ready!", $218b
 
-	reset_ppu_scrolling
+	reset_ppu_scrolling_and_ctrl
+	jsr vblank_wait
 	jsr enable_all
 	rts
 
@@ -272,9 +273,9 @@ show_ready:
 		; Not really doing anything... just makes it look less like we're locked for frames. Could easily be ditched.
 		jsr read_controller
 		jsr sound_update
-		reset_ppu_scrolling
+		reset_ppu_scrolling_and_ctrl
 		jsr vblank_wait
-		reset_ppu_scrolling
+		reset_ppu_scrolling_and_ctrl
 		pla
 		tax
 		inx
