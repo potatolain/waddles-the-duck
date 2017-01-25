@@ -291,6 +291,7 @@
 	SONG_INTRO			= 13
 	SONG_TITLE			= 2
 	SONG_BAD_ENDING		= 8
+	SONG_GOOD_ENDING	= 8
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
