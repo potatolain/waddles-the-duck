@@ -19,6 +19,7 @@
 .endmacro
 
 .macro draw_full_screen screen, sprites
+	jsr vblank_wait
 	jsr disable_all
 	jsr vblank_wait
 	jsr sound_update
@@ -26,8 +27,8 @@
 	draw_sprites sprites
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait
-	jsr sound_update
 	jsr enable_all
+	jsr sound_update
 
 .endmacro
 
@@ -68,6 +69,7 @@ show_good_ending:
 
 	draw_good_ending_screen 1
 
+	jsr vblank_wait
 	set_ppu_addr $3f00
 	lda #0
 	ldx #0
@@ -237,6 +239,7 @@ show_bad_ending:
 
 	draw_ending_screen 1
 
+	jsr vblank_wait
 	set_ppu_addr $3f00
 	lda #0
 	ldx #0
