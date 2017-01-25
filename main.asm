@@ -5279,6 +5279,7 @@ clear_var_sprites:
 	rts
 	
 show_level: 
+	jsr vblank_wait
 	jsr disable_all
 	jsr vblank_wait
 	jsr update_gem_count
@@ -5325,7 +5326,8 @@ show_level:
 	ora #%00000100
 	sta ppuCtrlBuffer
 
-	reset_ppu_scrolling
+	reset_ppu_scrolling_and_ctrl
+	jsr vblank_wait
 	jsr enable_all
 	jsr load_sprite0
 	;reset_ppu_scrolling
