@@ -194,6 +194,7 @@ show_good_ending:
 			jsr sound_update
 			draw_nametable the_end_tile
 			reset_ppu_scrolling_and_ctrl
+			draw_sprites the_end_sprites
 			jsr vblank_wait
 			jsr sound_update
 			jsr enable_all
@@ -535,3 +536,32 @@ good_ending_sprites_5:
 		.byte $ff
 	.endscope
 
+the_end_sprites:
+	.scope THE_END_SPRITES
+		DX1 = 60
+		DY1 = 136
+		.byte DY1, $c0, 0, DX1, DY1, $c1, 0, DX1+8, DY1, $c2, 0, DX1+16
+		.byte DY1+8, $d0, 0, DX1, DY1+8, $d1, 0, DX1+8, DY1+8, $d2, 0, DX1+16
+		
+		DX2 = 160
+		DY2 = 136
+		.byte DY2, $c2, $40, DX2, DY2, $c1, $40, DX2+8, DY2, $c0, $40, DX2+16
+		.byte DY2+8, $d2, $40, DX2, DY2+8, $d1, $40, DX2+8, DY2+8, $d0, $40, DX2+16
+
+		DX3 = 90
+		DY3 = 128
+		.byte DY3, $c4, 0, DX3, DY3, $c5, 0, DX3+8
+
+		DX4 = 140
+		DY4 = 128
+		.byte DY4, $c5, $40, DX4, DY4, $c4, $40, DX4+8
+
+		DX5 = 120
+		DY5 = 148
+		.byte DY5, $c4, 0, DX5, DY5, $c5, 0, DX5+8
+
+
+
+		.byte $ff
+
+	.endscope
