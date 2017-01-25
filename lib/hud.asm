@@ -25,7 +25,26 @@ show_hud:
 	
 	rts
 
+hide_hud_gem_count:
+	
+	set_ppu_addr $2059
+	lda #TILE_HUD_BLANK
+	.repeat 6
+		sta PPU_DATA
+	.endrepeat
+
+	lda #SPRITE_OFFSCREEN
+	sta HUD_GEM_SPRITE
+	rts
+
 update_hud_gem_count: 
+	
+	lda currentLevel
+	cmp #LEVEL_9_ID
+	beq hide_hud_gem_count ; uhoh! We shouldn't do this... go do your thing.
+	lda currentDimension
+	cmp #DIMENSION_END_OF_DAYS
+	beq hide_hud_gem_count
 
 	set_ppu_addr $2059
 
