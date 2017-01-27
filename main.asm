@@ -291,7 +291,7 @@
 	SONG_INTRO			= 13
 	SONG_TITLE			= 2
 	SONG_BAD_ENDING		= 8
-	SONG_GOOD_ENDING	= 8
+	SONG_GOOD_ENDING	= 14
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings
@@ -5294,6 +5294,7 @@ show_level:
 	and #%11111000 ; set to nametable 0
 	sta PPU_CTRL
 	sta ppuCtrlBuffer
+	jsr vblank_wait
 
 	jsr load_level
 	jsr clear_sprites
@@ -5309,6 +5310,7 @@ show_level:
 	ora #%00000100
 	sta PPU_CTRL
 	sta ppuCtrlBuffer
+	jsr vblank_wait
 
 	jsr load_nametable
 
@@ -5318,6 +5320,7 @@ show_level:
 	and #%11111011
 	sta PPU_CTRL
 	sta ppuCtrlBuffer
+	jsr vblank_wait
 
 	jsr show_hud
 
@@ -5337,6 +5340,7 @@ show_level:
 	
 	jsr play_music_for_dimension
 	
+	jsr vblank_wait
 	jmp main_loop
 
 

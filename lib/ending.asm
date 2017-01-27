@@ -49,6 +49,9 @@
 show_good_ending: 
 	lda #SONG_GOOD_ENDING
 	jsr music_play
+	lda #1
+	jsr music_pause
+
 
 	lda #%11001000
 	sta ppuCtrlBuffer
@@ -112,6 +115,9 @@ show_good_ending:
 		@not_2nd:
 		bne16 720, tempe, @not_2nd_fadein
 			jsr do_menu_fade_in
+			lda #0
+			jsr music_pause
+
 		@not_2nd_fadein:
 
 
