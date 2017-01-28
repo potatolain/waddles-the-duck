@@ -156,7 +156,7 @@ load_title:
 
 	load_title_no_gems:
 
-		write_string "- Press Start -", $21a8
+		write_string "- Press Start -", $21e8
 	after_no_gems:
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait

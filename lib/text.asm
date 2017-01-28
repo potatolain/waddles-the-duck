@@ -383,6 +383,8 @@ load_title_text:
 		write_string .sprintf("Version %04s Build %05d", VERSION, BUILD), $2321
 		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
 		write_string SPLASH_MESSAGE, $2361, $1e
+	.else 
+		write_string COPYRIGHT, $2361, $1e
 	.endif
 
 	.if DEBUGGING = 1

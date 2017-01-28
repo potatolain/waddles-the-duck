@@ -19,7 +19,7 @@ PACKBITS=tools/p8nes/winbinaries/packbits
 CONFIG_FILE=$(ROOT_DIR)/ca65-utils/nesgame-chr.cfg
 TEXT2DATA=sound/text2data
 NSF2DATA=sound/nsf2data
-VERSION=0.1a
+VERSION=1.0-pre   
 
 ### USER EDITABLE STUFF ENDS HERE
 
@@ -30,8 +30,11 @@ GRAPHICS=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.chr, %.chr.pk
 NAMETABLES=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.nam, %.nam.pkb, $(wildcard graphics/*.nam)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
-# Hacky magic to read a random line from our file of splash messages.
-SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
+# Old way: Hacky magic to read a random line from our file of splash messages.
+# SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
+# New way: Force splash message to second line, and give it static text.
+SPLASH_MESSAGE=>                               Prerelease Build
+COPYRIGHT=Copyright 2016-2017 cpprograms
 
 # In theory, most of this makefile (save for the famitone utils, windows only...) should work on Linux/Mac OS. If you find issues, report em!
 ifeq ($(OS),Windows_NT)
@@ -52,6 +55,7 @@ generate_constants:
 	@echo .define 		VERSION 		"$(VERSION)" >> lib/project_constants.asm
 	@echo .define 		BUILD_DATE		"$(BUILD_DATE)" >> lib/project_constants.asm
 	@echo .define 		SPLASH_MESSAGE 	"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
+	@echo .define 		COPYRIGHT		"$(COPYRIGHT)" >> lib/project_constants.asm
 	
 sound_files: sound/music.s sound/sfx.s
 
