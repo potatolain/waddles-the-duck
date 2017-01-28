@@ -397,7 +397,7 @@ show_bad_ending:
 			jsr do_menu_fade_in
 		@not_the_end_fade_in:
 
-		bcs16 4765, tempe, @no_music_death
+		bcs16 4865, tempe, @no_music_death
 			lda #1
 			jsr music_pause
 		@no_music_death:
