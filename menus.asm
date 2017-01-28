@@ -73,7 +73,7 @@ load_menu:
 		cpy #$40
 		bne @clear_attributes
 
-	reset_ppu_scrolling
+	reset_ppu_scrolling_and_ctrl
 	rts
 	
 load_title:
@@ -158,9 +158,9 @@ load_title:
 
 		write_string "- Press Start -", $21a8
 	after_no_gems:
-	
+	reset_ppu_scrolling_and_ctrl
+	jsr vblank_wait
 	jsr enable_all
-	reset_ppu_scrolling
 	rts
 
 show_title: 
