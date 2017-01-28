@@ -33,7 +33,7 @@ BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
 # Old way: Hacky magic to read a random line from our file of splash messages.
 # SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
 # New way: Force splash message to second line, and give it static text.
-SPLASH_MESSAGE=>                               Prerelease Build
+SPLASH_MESSAGE=*                               Prerelease Build
 COPYRIGHT=Copyright 2016-2017 cpprograms
 
 # In theory, most of this makefile (save for the famitone utils, windows only...) should work on Linux/Mac OS. If you find issues, report em!
