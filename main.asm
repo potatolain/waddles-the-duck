@@ -5284,7 +5284,7 @@ clear_var_sprites:
 	
 show_level: 
 	jsr vblank_wait
-	jsr disable_all
+	jsr disable_all_plus_interrupts
 	jsr vblank_wait
 	jsr update_gem_count
 	jsr get_game_gem_count
@@ -5335,7 +5335,7 @@ show_level:
 
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait
-	jsr enable_all
+	jsr enable_all_plus_interrupts
 	jsr load_sprite0
 	;reset_ppu_scrolling
 	lda #PLAYER_DIRECTION_RIGHT
@@ -5900,11 +5900,39 @@ enable_all:
 	sta PPU_MASK
 	rts
 
+disable_all_plus_interrupts:
+	jsr disable_all
+	jsr vblank_wait
+	lda ppuCtrlBuffer
+	and #%01111111
+	sta ppuCtrlBuffer
+	sta PPU_CTRL
+	rts
+
+enable_all_plus_interrupts:
+	lda ppuCtrlBuffer
+	ora #%10000000
+	sta ppuCtrlBuffer
+	sta PPU_CTRL
+	jsr vblank_wait
+	reset_ppu_scrolling_and_ctrl
+	jsr enable_all
+	jsr vblank_wait
+	rts
+
 vblank_wait: 
+	; Little bit of code to protect ourselves from... well, ourselves. 
+	; If we've turned off interrupts, return immediately.
+	lda ppuCtrlBuffer
+	and #%10000000
+	cmp #0
+	beq @get_out
+
 	lda frameCounter
 	@vblank_loop:
 		cmp frameCounter
 		beq @vblank_loop
+	@get_out:
 	rts
 	
 .include "lib/controller.asm"
