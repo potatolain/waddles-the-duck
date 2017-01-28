@@ -56,6 +56,8 @@
 	tempf:							.res 1
 	tempCollision:					.res 1 ; Yes, this is lame.
 	playerPosition:					.res 2
+	playerSpriteCollisionPosition:	.res 2
+	playerSpriteCollisionTop:		.res 1
 	playerScreenPosition:			.res 1
 	tempPlayerPosition:				.res 2
 	tempPlayerScreenPosition:		.res 1
@@ -154,26 +156,30 @@
 	CURRENT_LEVEL_DATA_LENGTH		= $40
 	CURRENT_LEVEL_DATA_TILE_LENGTH 	= $20
 	
-	PLAYER_VELOCITY_NORMAL 		= $01
-	PLAYER_VELOCITY_FAST		= $02
-	PLAYER_VELOCITY_FALLING		= $02
-	PLAYER_VELOCITY_JUMPING		= $100-$02 ; rotato! (Make it pseudo negative to wrap around.)
-	PLAYER_JUMP_TIME_RUN		= $1c
-	PLAYER_JUMP_TIME			= $18
-	HOP_LOCK_TIME				= $6
-	RUN_MOVEMENT_LOCK_TIME		= $0a
-	ICE_RUN_MOVEMENT_LOCK_TIME	= $1a
-	PLAYER_DIRECTION_LEFT		= $20
-	PLAYER_DIRECTION_RIGHT		= $0
-	PLAYER_DIRECTION_MASK		= %00100000
-	SPRITE_ZERO_POSITION		= $17
-	SPRITE_ZERO_X				= $80
-	PLAYER_HEIGHT				= 16
-	PLAYER_WIDTH				= 24
-	HEADER_PIXEL_OFFSET			= 48
-	SPRITE_HEIGHT_OFFSET		= 8
-	SPRITE_VELOCITY_NORMAL		= 1 ; This trips every other frame, so multiply accordinly.
-	SPRITE_X_CUTOFF 			= 240
+	PLAYER_VELOCITY_NORMAL 			= $01
+	PLAYER_VELOCITY_FAST			= $02
+	PLAYER_VELOCITY_FALLING			= $02
+	PLAYER_VELOCITY_JUMPING			= $100-$02 ; rotato! (Make it pseudo negative to wrap around.)
+	PLAYER_JUMP_TIME_RUN			= $1c
+	PLAYER_JUMP_TIME				= $18
+	HOP_LOCK_TIME					= $6
+	RUN_MOVEMENT_LOCK_TIME			= $0a
+	ICE_RUN_MOVEMENT_LOCK_TIME		= $1a
+	PLAYER_DIRECTION_LEFT			= $20
+	PLAYER_DIRECTION_RIGHT			= $0
+	PLAYER_DIRECTION_MASK			= %00100000
+	SPRITE_ZERO_POSITION			= $17
+	SPRITE_ZERO_X					= $80
+	PLAYER_HEIGHT					= 16
+	PLAYER_WIDTH					= 24
+	SPRITE_COLLISION_LEFT_OFFSET 	= 6
+	SPRITE_COLLISION_WIDTH_OFFSET	= 6
+	SPRITE_COLLISION_TOP_OFFSET		= 2
+	SPRITE_COLLISION_HEIGHT_OFFSET 	= 3
+	HEADER_PIXEL_OFFSET				= 48
+	SPRITE_HEIGHT_OFFSET			= 8
+	SPRITE_VELOCITY_NORMAL			= 1 ; This trips every other frame, so multiply accordinly.
+	SPRITE_X_CUTOFF 				= 240
 
 	DIMENSIONAL_SWAP_TIME		= 64
 
@@ -3061,16 +3067,29 @@ test_sprite_collision:
 	sta hasStompedSprite
 	lda PLAYER_SPRITE
 	clc
-	adc #PLAYER_HEIGHT
+	adc #PLAYER_HEIGHT-SPRITE_COLLISION_HEIGHT_OFFSET
 	sta temp1 ; player y2
 
 	lda playerPosition
 	clc
-	adc #PLAYER_WIDTH
+	adc #PLAYER_WIDTH-SPRITE_COLLISION_WIDTH_OFFSET
 	sta temp2 ; player x2
 	lda playerPosition+1
 	adc #0
 	sta tempe
+
+	lda PLAYER_SPRITE
+	clc
+	adc #SPRITE_COLLISION_TOP_OFFSET
+	sta playerSpriteCollisionTop
+
+	lda playerPosition
+	clc
+	adc #SPRITE_COLLISION_LEFT_OFFSET
+	sta playerSpriteCollisionPosition
+	lda playerPosition+1
+	adc #0
+	sta playerSpriteCollisionPosition+1
 
 	ldx #0
 	@loop:
@@ -3098,11 +3117,11 @@ test_sprite_collision:
 
 		lda EXTENDED_SPRITE_DATA+SPRITE_DATA_X+1, x
 		adc #0
-		cmp playerPosition+1
+		cmp playerSpriteCollisionPosition+1
 		bcc @continue
 		bne @safe_2
 		lda tempf
-		cmp playerPosition ; playerLeftEdge
+		cmp playerSpriteCollisionPosition ; playerLeftEdge
 		bcc @continue
 
 		@safe_2:
@@ -3114,7 +3133,7 @@ test_sprite_collision:
 		jsr get_current_sprite_y
 		clc
 		adc EXTENDED_SPRITE_DATA+SPRITE_DATA_HEIGHT, x ; enemyBottomEdge
-		cmp PLAYER_SPRITE ; playerTopEdge
+		cmp playerSpriteCollisionTop ; playerTopEdge
 		bcc @continue
 
 		; Is this sprite dead? Don't do things with dead sprites. It's just wrong.
@@ -3743,11 +3762,11 @@ do_sprite_collision:
 	@not_collectible:
 	cmp #SPRITE_TYPE_JUMPABLE_ENEMY
 	bne @not_jumpable
-		lda PLAYER_SPRITE
+		lda playerSpriteCollisionTop
 		sec
 		sbc playerYVelocity ; put you back where you were last frame for comparison.
 		clc
-		adc #PLAYER_HEIGHT
+		adc #PLAYER_HEIGHT-SPRITE_COLLISION_HEIGHT_OFFSET-SPRITE_COLLISION_TOP_OFFSET
 		sta temp6
 		jsr get_current_sprite_y
 		cmp temp6
