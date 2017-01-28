@@ -15,7 +15,7 @@
 	jsr clear_sprites
 	store #<(name), tempAddr
 	store #>(name), tempAddr+1
-	jsr draw_title_sprites
+	jsr draw_title_sprites_origin
 .endmacro
 
 .macro draw_full_screen screen, sprites
@@ -44,7 +44,6 @@
 .macro draw_ending_text_only num
 	draw_full_screen .ident(.concat("ending_tile_", .string(num))), .ident(.concat("ending_sprites_", .string(num)))
 .endmacro
-
 
 show_good_ending: 
 	lda #SONG_GOOD_ENDING
@@ -97,6 +96,7 @@ show_good_ending:
 	@loop:
 		jsr sound_update
 		jsr read_controller
+		jsr draw_title_sprites
 
 		inc tempe
 		lda #0
@@ -279,6 +279,7 @@ show_bad_ending:
 	@loop:
 		jsr sound_update
 		jsr read_controller
+		jsr draw_title_sprites
 
 		inc tempe
 		lda #0

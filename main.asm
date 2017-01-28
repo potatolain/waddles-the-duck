@@ -292,7 +292,6 @@
 	SONG_TITLE			= 2
 	SONG_BAD_ENDING		= 8
 	SONG_GOOD_ENDING	= 0
-	SONG_GOOD_ENDING_2	= 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Famitone Settings

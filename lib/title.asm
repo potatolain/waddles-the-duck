@@ -6,7 +6,7 @@
 
 	store #<(.ident(.concat("title_sprites_", .string(num)))), tempAddr
 	store #>(.ident(.concat("title_sprites_", .string(num)))), tempAddr+1
-	jsr draw_title_sprites
+	jsr draw_title_sprites_origin
 .endmacro
 
 .macro draw_title_text_only num
@@ -17,7 +17,7 @@
 
 	store #<(.ident(.concat("title_sprites_", .string(num)))), tempAddr
 	store #>(.ident(.concat("title_sprites_", .string(num)))), tempAddr+1
-	jsr draw_title_sprites
+	jsr draw_title_sprites_origin
 .endmacro
 
 show_intro:
@@ -65,6 +65,7 @@ show_intro:
 	@loop:
 		jsr sound_update
 		jsr read_controller
+		jsr draw_title_sprites
 		lda ctrlButtons
 		cmp #CONTROLLER_START
 		beq @no_start
@@ -207,7 +208,7 @@ bright_flash:
 	ldx #24
 	lda #SPRITE_OFFSCREEN
 	@loop_desprite:
-		sta SPRITE_DATA, x
+		sta EXTENDED_SPRITE_DATA, x
 		inx
 		cpx #0
 		bne @loop_desprite
@@ -246,21 +247,100 @@ bright_flash:
 	plx
 	rts
 
-draw_title_sprites: 
+draw_title_sprites_origin: 
 	phy
 	ldy #0
 	@loop:
 		lda (tempAddr), y
 		cmp #$ff
 		beq @done
-		sta SPRITE_DATA, y
+		sta EXTENDED_SPRITE_DATA, y
 		iny
 		.repeat 3
 			lda (tempAddr), y
-			sta SPRITE_DATA, y
+			sta EXTENDED_SPRITE_DATA, y
 		.endrepeat
 		jmp @loop
 	@done:
+	ply
+	rts
+
+; Copies ending_sprites over, adding floating for any sprites that deserve it.
+draw_title_sprites:
+	lda frameCounter
+	and #%001100000
+	lsr
+	lsr
+	lsr
+	lsr
+	lsr
+	sta tempa
+	cmp #1
+	bcc @low
+		; It's above... cut it down to its own size
+		lda #2
+		sec
+		sbc tempa
+		sta tempa
+	@low:
+	phy
+	ldy #0
+	@loop:
+		lda EXTENDED_SPRITE_DATA+1, y
+		cmp #$c0
+		bcc @not_grp1
+		cmp #$c6
+		bcs @not_grp1
+			jmp @rotator
+		@not_grp1:
+		cmp #$d0
+		bcc @not_grp2
+		cmp #$d6
+		bcs @not_grp2
+			jmp @rotator
+		@not_grp2:
+
+			; Plain, non-rotating sprite code
+			sta SPRITE_DATA+1, y
+			lda EXTENDED_SPRITE_DATA+2, y
+			sta SPRITE_DATA+2, y
+			lda EXTENDED_SPRITE_DATA+3, y
+			sta SPRITE_DATA+3, y
+			lda EXTENDED_SPRITE_DATA, y
+			sta SPRITE_DATA, y
+			jmp @continue
+		
+		@rotator:
+
+			; Regular rotating sprite
+			sta SPRITE_DATA+1, y
+			lda EXTENDED_SPRITE_DATA+2, y
+			sta SPRITE_DATA+2, y
+			lda EXTENDED_SPRITE_DATA+3, y
+			sta SPRITE_DATA+3, y
+
+			lda EXTENDED_SPRITE_DATA, y
+			cmp #17
+			bcc @skip
+			cmp #SPRITE_OFFSCREEN-1
+			bcs @skip
+			clc
+			adc tempa
+			jmp @do
+			@skip:
+				lda #SPRITE_OFFSCREEN
+			@do:
+			sta SPRITE_DATA, y
+
+
+
+		@continue: 
+		.repeat 4
+		iny
+		.endrepeat
+		cpy #0
+		bne @loop
+
 	ply
 	rts
 
