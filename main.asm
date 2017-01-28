@@ -4412,7 +4412,7 @@ handle_main_input:
 load_sprite0:
 	lda #$ff
 	sta SPRITE_ZERO+1
-	lda #%00000000
+	lda #%00000011
 	sta SPRITE_ZERO+2
 	lda #SPRITE_ZERO_X
 	sta SPRITE_ZERO+3
@@ -4517,6 +4517,10 @@ load_palettes_for_dimension:
 		inx
 		cpy #16
 		bne @loop
+	set_ppu_addr $3f1f
+	lda default_palettes-10, x
+	sta PPU_DATA
+	
 	pla
 	tay
 	pla
