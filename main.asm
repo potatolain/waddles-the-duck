@@ -3588,12 +3588,18 @@ draw_default_sprite_size:
 		cmp #DIMENSION_END_OF_DAYS
 		beq @oh_yeah_its_a_grabber ; you are allowed
 		; Okay its a grabber... clean up our mess...
+		@grabber_wrong_dimension:
 		pla
 		jmp @kill_the_sprite ; and go away
 		@oh_yeah_its_a_grabber:
 		; It *is* a grabber... these need to float a little bit, so let's add to their y position.
 		lda #6
 		sta scratch1
+		; And, actually, let's only draw them every other screen to make them flicker and look scarier
+		lda frameCounter
+		and #%00000010
+		cmp #0
+		beq @grabber_wrong_dimension
 	@not_grabber:
 	pla
 	sta VAR_SPRITE_DATA+3, y
