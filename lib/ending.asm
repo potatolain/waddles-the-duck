@@ -51,7 +51,11 @@ show_good_ending:
 	jsr music_play
 	lda #1
 	jsr music_pause
+	lda #SFX_WARP
+	ldx #FT_SFX_CH0
+	jsr sfx_play
 
+	jsr disable_all
 
 	lda #%11001000
 	sta ppuCtrlBuffer
@@ -70,11 +74,9 @@ show_good_ending:
 	sta tempe
 	sta tempf 
 
-	draw_good_ending_screen 1
-
 	jsr vblank_wait
 	set_ppu_addr $3f00
-	lda #0
+	lda #$0f
 	ldx #0
 	@loop_pal:
 		sta PPU_DATA
@@ -83,13 +85,13 @@ show_good_ending:
 		bne @loop_pal
 
 
+	draw_good_ending_screen 1
+
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait
 
 	jsr vblank_wait
 	jsr enable_all
-
-	jsr do_menu_fade_in
 
 
 	@loop:
@@ -105,6 +107,10 @@ show_good_ending:
 		
 		jsr vblank_wait
 
+
+		bne16 100, tempe, @not_firstfade
+			jsr do_menu_fade_in
+		@not_firstfade:
 
 		bne16 689, tempe, @not_1st_fadeout
 			jsr do_menu_fade_out
@@ -225,6 +231,12 @@ show_good_ending:
 show_bad_ending:
 	lda #SONG_BAD_ENDING
 	jsr music_play
+	lda #1
+	jsr music_pause
+	lda #SFX_WARP
+	ldx #FT_SFX_CH0
+	jsr sfx_play
+
 
 	lda #%11001000
 	sta ppuCtrlBuffer
@@ -243,11 +255,9 @@ show_bad_ending:
 	sta tempe
 	sta tempf 
 
-	draw_ending_screen 1
-
 	jsr vblank_wait
 	set_ppu_addr $3f00
-	lda #0
+	lda #$0f
 	ldx #0
 	@loop_pal:
 		sta PPU_DATA
@@ -256,13 +266,14 @@ show_bad_ending:
 		bne @loop_pal
 
 
+	draw_ending_screen 1
+
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait
 
 	jsr vblank_wait
 	jsr enable_all
 
-	jsr do_menu_fade_in
 
 
 	@loop:
@@ -278,6 +289,11 @@ show_bad_ending:
 		
 		jsr vblank_wait
 
+		bne16 100, tempe, @not_musica
+			jsr do_menu_fade_in
+			lda #0
+			jsr music_pause
+		@not_musica:
 
 		bne16 689, tempe, @not_1st_fadeout
 			jsr do_menu_fade_out
