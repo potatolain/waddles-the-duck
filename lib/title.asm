@@ -244,6 +244,7 @@ bright_flash:
 
 	jsr vblank_wait
 	jsr load_palettes_for_dimension
+	reset_ppu_scrolling_and_ctrl
 	plx
 	rts
 
