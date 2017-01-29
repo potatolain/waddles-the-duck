@@ -31,6 +31,8 @@ show_professor_text:
     sta textPage
 
     jsr show_updated_text
+	jsr sound_update
+	reset_ppu_scrolling_and_ctrl
     jsr enable_all
 
 
@@ -51,6 +53,7 @@ show_professor_text:
 
 	@loop:
 		jsr vblank_wait
+		reset_ppu_scrolling_and_ctrl
 		jsr sound_update
 		jsr read_controller
 		lda ctrlButtons
@@ -60,12 +63,15 @@ show_professor_text:
 		and #CONTROLLER_A
 		bne @loop
         ; Okay, you pressed something, update the text and do things accordingly
-        jsr disable_all
+		reset_ppu_scrolling_and_ctrl
+
         jsr vblank_wait
         jsr show_updated_text
 		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
 		jsr vblank_wait
-        jsr enable_all
+
+		jsr sound_update
         lda textPage
         cmp #255
         bne @loop
@@ -117,6 +123,9 @@ show_updated_text:
     professor_text_0:
 	    set_ppu_addr $2301
         write_ppu_text " Prof "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -141,6 +150,9 @@ show_updated_text:
 	professor_text_2:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
 		write_ppu_text .concat( \
@@ -153,6 +165,9 @@ show_updated_text:
     professor_text_3:
         set_ppu_addr $2301
         write_ppu_text " Prof -----"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
 		write_ppu_text .concat( \
@@ -165,6 +180,9 @@ show_updated_text:
     professor_text_4:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -176,12 +194,15 @@ show_updated_text:
 
     professor_text_5:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \ 
 			"With more time and gems,        ", \
-			"maybe I could get closer, but   ", \
+			"I could get closer, but         ", \
 			"it would take years.            "  \
 		)
 		rts
@@ -207,6 +228,9 @@ show_updated_text:
     professor_eod_text_0:
 	    set_ppu_addr $2301
         write_ppu_text " Prof "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -231,6 +255,9 @@ show_updated_text:
 	professor_eod_text_2:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -242,7 +269,10 @@ show_updated_text:
 
     professor_eod_text_3:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -254,7 +284,10 @@ show_updated_text:
 
     professor_eod_text_4:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -266,7 +299,10 @@ show_updated_text:
 
     professor_eod_text_5:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -278,7 +314,10 @@ show_updated_text:
 
     professor_eod_text_6:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -290,7 +329,10 @@ show_updated_text:
 
     professor_eod_text_7:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -303,6 +345,9 @@ show_updated_text:
     professor_eod_text_8:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -314,7 +359,10 @@ show_updated_text:
 
     professor_eod_text_9:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -327,6 +375,9 @@ show_updated_text:
     professor_eod_text_10:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -339,6 +390,9 @@ show_updated_text:
     professor_eod_text_11:
         set_ppu_addr $2301
         write_ppu_text " Waddles "
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -350,7 +404,10 @@ show_updated_text:
 
 	professor_eod_text_12:
         set_ppu_addr $2301
-        write_ppu_text " Prof -----"
+        write_ppu_text " Prof ---"
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
@@ -371,33 +428,16 @@ load_title_text:
 	jsr PKB_unpackblk
 	
 	.if SHOW_VERSION_STRING = 1
-		set_ppu_addr $2320
-		ldx #$80
-		lda #CHAR_SPACE
-		@loop_clear: 
-			sta PPU_DATA
-			dex
-			cpx #$0
-			bne @loop_clear
-
 		write_string .sprintf("Version %04s Build %05d", VERSION, BUILD), $2321
 		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
-		write_string SPLASH_MESSAGE, $2361, $1e
+		write_string SPLASH_MESSAGE, $2381, $1e
 	.else 
 		write_string COPYRIGHT, $2361, $1e
 	.endif
 
 	.if DEBUGGING = 1
-		set_ppu_addr $2300
-		ldx #$20
-		lda #CHAR_SPACE
-		@loop_clear2:
-			sta PPU_DATA
-			dex
-			cpx #0
-			bne @loop_clear2
 		
-		write_string .sprintf("Debug mode enabled"), $2301
+		write_string .sprintf("Debug enabled"), $2301
 	.endif
 	rts
 

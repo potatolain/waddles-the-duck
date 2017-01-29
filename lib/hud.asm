@@ -112,8 +112,9 @@ show_bottom_hud:
 	bank #BANK_SPRITES_AND_LEVEL
 	
 	jsr draw_switchable_tiles ; Redraws all animated tiles to the cache, replacing the stuff we blew away above to restore the screen.
-	reset_ppu_scrolling
+	reset_ppu_scrolling_and_ctrl
 
+	jsr vblank_wait
 	jsr vblank_wait
 	jsr enable_all
 
