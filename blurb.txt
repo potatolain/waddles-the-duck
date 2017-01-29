@@ -4,8 +4,7 @@ Submitted By: 	cppchriscpp
 
 Category:	1 (Main competition)
 
-Description:  	You are a duck taken out of his own timeline, trying to find his way back
-		home. 
+Description:  	You are a duck taken out of his own timeline, trying to find his way home. 
 
 		A typical sidescroller with a slight twist.
 
@@ -26,4 +25,4 @@ Credits:	cppchriscpp - Code/Art/Music
 		
 
 Other:		Tested on multiple emulators, as well as a top-loader NES and a toaster NES.
-		Hardware tests done using InfiniteNesLievs 128KB UNROM cart and doubled rom.
+		Hardware tests done using InfiniteNesLives 128KB UNROM cart, and doubled rom.

@@ -258,8 +258,8 @@ show_updated_text:
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
 			"The panel upstairs can take     ", \
-        	"you to the exact date and time  ", \
-        	"you were taken from.            "  \
+        	"you to the exact date and       ", \
+        	"time you were taken from.       "  \
 		)
 		rts
 
@@ -348,7 +348,7 @@ show_updated_text:
         set_ppu_addr $2342 ; Second row, second char
         write_ppu_text .concat( \
 			"When you find it, you will be   ", \
-        	"teleported back to your own     ", \
+        	"transported back to your own    ", \
         	"timeline.                       "  \
 		)
 		rts
