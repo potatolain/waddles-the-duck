@@ -366,7 +366,7 @@ SPRITE_DATA_EXTRA_IS_HIDDEN			= 255 ; Used for collectibles hidden behind blocks
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ; Misc	
-	SHOW_VERSION_STRING = 1
+	SHOW_VERSION_STRING = 0
 	BASE_NUMBER_OF_LEVELS = 9
 	BASE_NUMBER_OF_REGULAR_LEVELS = 8
 

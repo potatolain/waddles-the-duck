@@ -1,5 +1,5 @@
-TITLE_CURSOR_X_OFFSET = 32
-TITLE_CURSOR_Y_OFFSET = 78
+TITLE_CURSOR_X_OFFSET = 42
+TITLE_CURSOR_Y_OFFSET = 102
 
 load_menu: 
 
@@ -148,18 +148,18 @@ load_title:
 		.repeat NUMBER_OF_REGULAR_LEVELS, I
 			.if I = 0 && DEBUGGING = 1
 				; Debugging level gets a special case, since we want level numbers to match with/without debugging.
-				write_string .sprintf("Level DD  "), $2146+I*$20
+				write_string .sprintf("Level DD  "), $21a7+I*$20
 				lda #I
 				jsr get_level_gem_count
 				draw_gem_count LVL_DEBUG_COLLECTIBLE_COUNT, temp1
 			.elseif DEBUGGING = 1
 				; Unfortunately since we added a special debugging level, we need separate logic for showing level numbers based on that.
-				write_string .sprintf("Level %02d  ", I), $2146+I*$20
+				write_string .sprintf("Level %02d  ", I), $21a7+I*$20
 				lda #I
 				jsr get_level_gem_count
 				draw_gem_count (.ident(.concat("LVL",.string(I),"_COLLECTIBLE_COUNT"))), temp1
 			.else
-				write_string .sprintf("Level %02d  ", I+1), $2146+I*$20
+				write_string .sprintf("Level %02d  ", I+1), $21a7+I*$20
 				lda #I
 				jsr get_level_gem_count
 				draw_gem_count (.ident(.concat("LVL",.string(I+1),"_COLLECTIBLE_COUNT"))), temp1

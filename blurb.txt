@@ -1,0 +1,29 @@
+Name: 		Waddles the Duck
+
+Submitted By: 	cppchriscpp
+
+Category:	1 (Main competition)
+
+Description:  	You are a duck taken out of his own timeline, trying to find his way back
+		home. 
+
+		A typical sidescroller with a slight twist.
+
+Controls:	D-pad: Movement
+		Select: When all else fails, press this.
+		Start: Starts the game, pauses while in game.
+		B: Run
+		A: Jump
+
+Rom info:	Mapper 2 (UNROM)
+		Filesize 64k
+		
+
+Credits:	cppchriscpp - Code/Art/Music
+		Turbolence88 - First Play Tester
+		Pix3m - Title font (Alargard)
+		Zaratustra Productions - Inspiration from the game Eversion
+		
+
+Other:		Tested on multiple emulators, as well as a top-loader NES and a toaster NES.
+		Hardware tests done using InfiniteNesLievs 128KB UNROM cart and doubled rom.
