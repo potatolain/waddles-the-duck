@@ -82,9 +82,23 @@ load_title:
 	lda #SONG_TITLE
 	jsr music_play
 
-	bank_temp #BANK_TEXT_ENGINE
-		jsr load_title_text
-	bank_restore
+	set_ppu_addr $2000
+	store #<(title_screen_base), tempAddr
+	store #>(title_screen_base), tempAddr+1
+	jsr PKB_unpackblk
+	
+	.if SHOW_VERSION_STRING = 1
+		write_string .sprintf("Version %04s Build %05d", VERSION, BUILD), $2321
+		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
+		write_string SPLASH_MESSAGE, $2381, $1e
+	.else 
+		write_string COPYRIGHT, $2361, $1e
+	.endif
+
+	.if DEBUGGING = 1
+		
+		write_string .sprintf("Debug enabled"), $2301
+	.endif
 
 	lda GAME_BEATEN_BYTE
 	cmp #0
@@ -305,3 +319,8 @@ game_end:
 		jmp show_good_ending
 	@bad_ending:
 		jmp show_bad_ending
+
+
+
+title_screen_base:
+	.incbin "graphics/processed/title_screen.nam.pkb"

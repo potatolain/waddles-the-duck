@@ -1,5 +1,7 @@
 show_professor_text:
 
+	jsr do_sprite0
+	jsr vblank_wait
 	set_ppu_addr $2300
 	
 	store #TILE_BORDER_TL, PPU_DATA
@@ -8,13 +10,24 @@ show_professor_text:
 		sta PPU_DATA
 	.endrepeat
 	store #TILE_BORDER_TR, PPU_DATA
+	jsr do_sprite0
+	lda #0
+    sta textPage
+
+	reset_ppu_scrolling_and_ctrl
+	jsr sound_update
+	jsr vblank_wait
 
 
-	.repeat 5
+	.repeat 5, I
+		set_ppu_addr $2320+($20*I)
 		lda #TILE_HUD_BLANK
 		.repeat $20
 			sta PPU_DATA
 		.endrepeat
+		reset_ppu_scrolling_and_ctrl
+		jsr sound_update
+		jsr vblank_wait
 	.endrepeat
 
 	set_ppu_addr $23f0
@@ -22,18 +35,15 @@ show_professor_text:
 	.repeat $10
 		sta PPU_DATA
 	.endrepeat
+	reset_ppu_scrolling_and_ctrl
 
-    ; Force the screen to scroll position 0. 
-    lda scrollX
-    pha
-    lda #0
-    sta scrollX
-    sta textPage
+	jsr sound_update
+	jsr vblank_wait
+
 
     jsr show_updated_text
-	jsr sound_update
 	reset_ppu_scrolling_and_ctrl
-    jsr enable_all
+	jsr sound_update
 
 
 	ldx #(VAR_SPRITE_DATA-SPRITE_DATA) ; Skip player, since relocating the player will likely result in death.
@@ -76,20 +86,21 @@ show_professor_text:
         cmp #255
         bne @loop
 
-    pla
-    sta scrollX
 
-
-	jsr disable_all
-	jsr vblank_wait
-	set_ppu_addr $2300
-	ldx #0
-	@loop_restore_original:
-		lda ANIMATED_TILE_CACHE, x
-		sta PPU_DATA
-		inx
-		cpx #0
-		bne @loop_restore_original
+	.repeat 4, I
+		jsr vblank_wait
+		set_ppu_addr $2300+(I*$40)
+		ldx #0
+		:
+			lda HUD_TEXT_BACKUP+(I*$40), x
+			sta PPU_DATA
+			inx
+			cpx #$40
+			bne :-
+		reset_ppu_scrolling_and_ctrl
+		jsr do_sprite0
+		jsr sound_update
+	.endrepeat
     rts
 
 
@@ -416,30 +427,3 @@ show_updated_text:
         	"                                "  \
 		)
 		rts
-
-
-
-; This creates an impressive number of commands due to the extreme simplicity/complexity of write_string
-; Moving this to a separate bank to free up a bit of space in the kernel
-load_title_text:
-	set_ppu_addr $2000
-	store #<(title_screen_base), tempAddr
-	store #>(title_screen_base), tempAddr+1
-	jsr PKB_unpackblk
-	
-	.if SHOW_VERSION_STRING = 1
-		write_string .sprintf("Version %04s Build %05d", VERSION, BUILD), $2321
-		write_string .sprintf("Built on: %24s", BUILD_DATE), $2341
-		write_string SPLASH_MESSAGE, $2381, $1e
-	.else 
-		write_string COPYRIGHT, $2361, $1e
-	.endif
-
-	.if DEBUGGING = 1
-		
-		write_string .sprintf("Debug enabled"), $2301
-	.endif
-	rts
-
-title_screen_base:
-	.incbin "graphics/processed/title_screen.nam.pkb"

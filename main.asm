@@ -20,8 +20,8 @@
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
 ; $400-41f: Unused
 ; $420-4ff: Static collectible data
-; $500-55f: Screen buffer
-; $560-5ff: Unused
+; $500-55f: Screen buffer/text backup
+; $560-5ff: more text backup
 ; $600-6ff: Animated tile buffer (If we need space, this could shrink to 1x, and reloaded every cycle)
 ; $700-7bf: Extended sprite data
 ; $7c0-7ff: Current level collectible data
@@ -137,6 +137,7 @@
 	GAME_BEATEN_BYTE				= $4fe
 	NEXT_ROW_CACHE					= $500
 	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
+	HUD_TEXT_BACKUP					= $500
 	ANIMATED_TILE_CACHE				= $600
 	EXTENDED_SPRITE_DATA			= $700
 	LEFT_ATTR_MASK					= %00110011
