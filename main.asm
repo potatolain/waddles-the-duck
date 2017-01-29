@@ -4937,6 +4937,7 @@ do_dimensional_transfer_unsafe:
 	and #%11111011
 	sta ppuCtrlBuffer ; Reset to going sequentially rather than incrementing by 32
 	jsr vblank_wait
+	jsr do_sprite0
 
 	
 	; TODO: Lots of hard coded numbers here... numbers are kinda necessary but I'm wondering if there's math I could pull off.
