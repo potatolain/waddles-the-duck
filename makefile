@@ -30,6 +30,8 @@ GRAPHICS=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.chr, %.chr.pk
 NAMETABLES=$(patsubst graphics/%, graphics/processed/%, $(patsubst %.nam, %.nam.pkb, $(wildcard graphics/*.nam)))
 BUILD_NUMBER=$(shell cat lib/buildnumber.txt)
 BUILD_NUMBER_INCREMENTED=$(shell expr $(BUILD_NUMBER) + 1)
+COMMIT_COUNT=$(shell git rev-list --count HEAD)
+CODE_LINE_COUNT=$(shell grep -r "^" --include="*.asm" --include="*.js" * | grep -v "levels/processed" | wc -l)
 # Old way: Hacky magic to read a random line from our file of splash messages.
 # SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
 # New way: Use static text
@@ -51,11 +53,13 @@ generate_constants:
 	@$(shell echo $(BUILD_NUMBER_INCREMENTED) > lib/buildnumber.txt)
 	@echo Defining project constants for $(VERSION) build $(BUILD_NUMBER_INCREMENTED) built on $(BUILD_DATE)
 	@echo Random message: $(SPLASH_MESSAGE)
-	@echo .define  		BUILD 			$(BUILD_NUMBER) > lib/project_constants.asm
-	@echo .define 		VERSION 		"$(VERSION)" >> lib/project_constants.asm
-	@echo .define 		BUILD_DATE		"$(BUILD_DATE)" >> lib/project_constants.asm
-	@echo .define 		SPLASH_MESSAGE 	"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
-	@echo .define 		COPYRIGHT		"$(COPYRIGHT)" >> lib/project_constants.asm
+	@echo .define  		BUILD 				$(BUILD_NUMBER) > lib/project_constants.asm
+	@echo .define 		VERSION 			"$(VERSION)" >> lib/project_constants.asm
+	@echo .define 		BUILD_DATE			"$(BUILD_DATE)" >> lib/project_constants.asm
+	@echo .define 		SPLASH_MESSAGE		"$(SPLASH_MESSAGE)" >> lib/project_constants.asm
+	@echo .define 		COPYRIGHT			"$(COPYRIGHT)" >> lib/project_constants.asm
+	@echo .define 		COMMIT_COUNT		$(COMMIT_COUNT) >> lib/project_constants.asm
+	@echo .define 		CODE_LINE_COUNT		$(CODE_LINE_COUNT) >> lib/project_constants.asm
 	
 sound_files: sound/music.s sound/sfx.s
 

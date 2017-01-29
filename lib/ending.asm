@@ -32,6 +32,13 @@
 
 .endmacro
 
+; Why have estimated stats when you can put the real ones in?
+draw_real_credits_numbers:
+	write_string .sprintf("% 6d", BUILD), $22f8
+	write_string .sprintf("% 6d", CODE_LINE_COUNT), $2318
+	write_string .sprintf("% 6d", COMMIT_COUNT), $2358
+	rts
+
 
 .macro draw_ending_screen num
 	draw_full_screen .ident(.concat("ending_tile_", .string(num))), .ident(.concat("ending_sprites_", .string(num)))
@@ -170,6 +177,7 @@ show_good_ending:
 			jsr vblank_wait
 			jsr sound_update
 			draw_nametable credits_tile_1
+			jsr draw_real_credits_numbers
 			reset_ppu_scrolling_and_ctrl
 			jsr clear_sprites
 			jsr vblank_wait
@@ -351,6 +359,7 @@ show_bad_ending:
 			jsr vblank_wait
 			jsr sound_update
 			draw_nametable credits_tile_1
+			jsr draw_real_credits_numbers
 			reset_ppu_scrolling_and_ctrl
 			jsr clear_sprites
 			jsr vblank_wait
