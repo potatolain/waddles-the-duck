@@ -20,7 +20,7 @@ Rom info:	Mapper 2 (UNROM)
 
 Credits:	cppchriscpp - Code/Art/Music
 		Turbolence88 - First Play Tester
-		Pix3m - Title font (Alargard)
+		Pix3m - Title font (Alagard)
 		Zaratustra Productions - Inspiration from the game Eversion
 		
 
