@@ -3,6 +3,7 @@
 # Prequisites:
 # - A few fairly standard unix applications available; Gow/Cygwin installed for Windows.
 # - ca65 binaries available in system path
+# - Nodejs for some level conversion scripts
 # - emulators and misc tools installed in "tools" folder. (If desired)
 
 ### USER EDITABLE STUFF STARTS HERE
