@@ -1,5 +1,7 @@
 # Waddles the Duck
 
+![Waddles](http://cpprograms.net/wp-content/uploads/main-6.png)!
+
 Waddles the Duck is a new NES game developed in 2016/2017 for the [2016 NESDev Competition](http://nesdevcompo.nintendoage.com/contest16/). 
 
 The basic story is, you're a duck that was taken out of his timeline by a mysterious force, trying to make your way home.
