@@ -132,7 +132,7 @@ are for can be looked up from constants in `main.asm`.
 
 # Tools Used
 
-I've referenced most tools used inline, but here's a full list if you want the cliffnotes version of what you can install.
+I've referenced most tools used inline, but here's a full list if you want the cliffnotes version of what you might want to install.
 
 - [FamiTracker](http://famitracker.com/)
 - [famitone2](https://shiru.untergrund.net/code.shtml)
