@@ -148,3 +148,4 @@ I've referenced most tools used inline, but here's a full list if you want the c
 - [NintendulatorDx](https://kkfos.aspekt.fi/)
 - [readnes3](https://github.com/AaronBottegal/ReadNES3) (Strips header from roms for writing to INL cartridges)
 - [INL Retro Prog](http://www.infiniteneslives.com/kazzo.php) (For writing actual cartridges)
+- [VS Code](https://code.visualstudio.com/) and [MADS Assembly Syntax](https://marketplace.visualstudio.com/items?itemName=mirao.mads) (Okay, this is personal preference, but if you haven't given this a shot yet and you don't hate the idea of an IDE, I recommend it!)
