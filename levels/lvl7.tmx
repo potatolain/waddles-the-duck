@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.0" orientation="orthogonal" renderorder="right-down" width="240" height="12" tilewidth="16" tileheight="16" nextobjectid="4">
- <tileset firstgid="1" name="Nes testicle" tilewidth="16" tileheight="16" tilecount="256" columns="8">
+ <tileset firstgid="1" name="Tiles" tilewidth="16" tileheight="16" tilecount="256" columns="8">
   <image source="../graphics/blocks_x4.bmp" width="128" height="512"/>
  </tileset>
  <tileset firstgid="257" name="Sprites" tilewidth="16" tileheight="16" tilecount="64" columns="8">
