@@ -84,14 +84,14 @@ show_intro:
 		jsr vblank_wait
 
 
-		bne16 250, tempe, @not_flash
+		bne16 375, tempe, @not_flash
 			jsr bright_flash
 		@not_flash:
-		bne16 289, tempe, @not_1st_fadeout
+		bne16 434, tempe, @not_1st_fadeout
 			jsr do_menu_fade_out
 		@not_1st_fadeout:
 		; Look up where in the cycle we are and if we need to take action.
-		bne16 290, tempe, @not_2nd
+		bne16 435, tempe, @not_2nd
 			jsr disable_all
 			jsr vblank_wait
 			jsr sound_update
@@ -101,13 +101,13 @@ show_intro:
 			jsr sound_update
 			jsr enable_all
 		@not_2nd:
-		bne16 320, tempe, @not_2nd_fadein
+		bne16 480, tempe, @not_2nd_fadein
 			jsr do_menu_fade_in
 		@not_2nd_fadein:
-		bne16 649, tempe, @not_2nd_fadeout
+		bne16 974, tempe, @not_2nd_fadeout
 			jsr do_menu_fade_out
 		@not_2nd_fadeout:
-		bne16 650, tempe, @not_3rd
+		bne16 975, tempe, @not_3rd
 			jsr disable_all
 			jsr vblank_wait
 			jsr sound_update
@@ -117,10 +117,10 @@ show_intro:
 			jsr sound_update
 			jsr enable_all
 		@not_3rd:
-		bne16 690, tempe, @not_3rd_fadein
+		bne16 1035, tempe, @not_3rd_fadein
 			jsr do_menu_fade_in
 		@not_3rd_fadein:
-		bne16 1110, tempe, @not_3rd_fadeout
+		bne16 1665, tempe, @not_3rd_fadeout
 			jsr do_menu_fade_out
 			rts
 		@not_3rd_fadeout:
