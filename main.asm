@@ -125,6 +125,7 @@
 	currentBackgroundColorOverride:	.res 1
 	dimensionSwapTimer:				.res 1
 	hasHitLastLevelWarpThing:		.res 1 ; Candidate for best variable name ever... if this is non-zero, we won't flip dimensions in level 9 anymore.
+	isMakingWarpySounds:			.res 1
 
 
 	CHAR_TABLE_START 				= $e1
@@ -275,7 +276,6 @@
 	SFX_COIN		= 1
 	SFX_FLAP		= 0
 	SFX_JUMP		= 2
-	SFX_DUCK 		= 3
 	SFX_CHIRP 		= 4
 	SFX_MENU		= 5
 	SFX_WARP		= 7
@@ -285,6 +285,8 @@
 	SFX_DEATH		= 11
 	SFX_BLOCK_HIT	= 12
 	SFX_MENU_TICK	= 13
+	SFX_IN_WARP		= 6
+	SFX_WARP_STOP	= 3
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ; Music
@@ -3783,7 +3785,7 @@ do_sprite_collision:
 			jsr squish_sprite
 
 		store #1, hasStompedSprite
-		
+
 		rts
 	@not_jumpable:
 	cmp #SPRITE_TYPE_INVULN_ENEMY
@@ -3796,7 +3798,7 @@ do_sprite_collision:
 		cmp #DIMENSION_END_OF_DAYS
 		bne @not_grabber
 		jmp do_player_death
-	@not_grabber:
+		@not_grabber:
 	cmp #SPRITE_TYPE_FIREBALL
 	bne @not_fireball
 		jmp do_player_death
@@ -5181,6 +5183,19 @@ update_buffer_for_warp_zone:
 		
 
 	@its_definitely_a_warp: 
+
+		lda isMakingWarpySounds
+		cmp #1
+		beq @already_making_warpy_sounds
+		; Lastly, start playing the warp sfx
+		lda #SFX_IN_WARP
+		ldx #FT_SFX_CH3
+		jsr sfx_play
+		lda #1
+		sta isMakingWarpySounds
+		@already_making_warpy_sounds:
+
+
 		; party time
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
@@ -5190,6 +5205,16 @@ update_buffer_for_warp_zone:
 
 	@restore_original_colors:
 		; Not a warp :(
+		
+		; Our warp sound effect is meant to loop forever, so we hackily never terminate the sound. As such, that's the only thing we put
+		; on channel 3. We need to call SFX_WARP_STOP to shut it up later.
+		lda #SFX_WARP_STOP
+		ldx #FT_SFX_CH3
+		jsr sfx_play
+
+		lda #0
+		sta isMakingWarpySounds
+
 		lda ppuMaskBuffer
 		and #DIMENSION_MASK^255
 		ora currentDimension
