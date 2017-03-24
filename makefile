@@ -22,6 +22,7 @@ TEXT2DATA=sound/text2data
 NSF2DATA=sound/nsf2data
 VERSION=1.1       
 SHOW_VERSION_STRING=1
+COPYRIGHT=Copyright 2016-2017 cpprograms
 
 ### USER EDITABLE STUFF ENDS HERE
 
@@ -37,8 +38,7 @@ CODE_LINE_COUNT=$(shell grep -r "^" --include="*.asm" --include="*.js" * | grep 
 # Old way: Hacky magic to read a random line from our file of splash messages.
 # SPLASH_MESSAGE=$(shell awk "NR==$(shell awk "BEGIN{srand();printf(\"%%d\", ($(shell wc -l lib/splash_messages.txt | awk "{print $$1}"))*rand()+1)}") {print;}" lib/splash_messages.txt) 
 # New way: Use static text
-SPLASH_MESSAGE=Prerelease Build
-COPYRIGHT=Copyright 2016-2017 cpprograms
+SPLASH_MESSAGE=Post-Contest Build
 
 # In theory, most of this makefile (save for the famitone utils, windows only...) should work on Linux/Mac OS. If you find issues, report em!
 ifeq ($(OS),Windows_NT)
