@@ -142,6 +142,13 @@ are for can be looked up from constants in `main.asm`.
 #### 1.0
 - Initial release
 
+#### 1.1 
+- _Development still in progress_
+- Fixed some obvious level issues
+- Now plays sfx when in warp areas
+- Intro is now slower. (And sounds crummier... sorry :()
+- Jump sound effect made less annoying (maybe)
+
 # Tools Used
 
 I've referenced most tools used inline, but here's a full list if you want the cliffnotes version of what you might want to install.

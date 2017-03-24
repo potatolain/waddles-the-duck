@@ -21,6 +21,7 @@ CONFIG_FILE=$(ROOT_DIR)/ca65-utils/nesgame-chr.cfg
 TEXT2DATA=sound/text2data
 NSF2DATA=sound/nsf2data
 VERSION=1.1   
+SHOW_VERSION_STRING=1
 
 ### USER EDITABLE STUFF ENDS HERE
 
@@ -61,6 +62,7 @@ generate_constants:
 	@echo .define 		COPYRIGHT			"$(COPYRIGHT)" >> lib/project_constants.asm
 	@echo .define 		COMMIT_COUNT		$(COMMIT_COUNT) >> lib/project_constants.asm
 	@echo .define 		CODE_LINE_COUNT		$(CODE_LINE_COUNT) >> lib/project_constants.asm
+	@echo .define		SHOW_VERSION_STRING $(SHOW_VERSION_STRING) >> lib/project_constants.asm
 	
 sound_files: sound/music.s sound/sfx.s
 
