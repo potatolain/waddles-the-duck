@@ -1325,7 +1325,7 @@ music_music_data:
 
 
 @song13ch0:
-	.byte $fb,$04
+	.byte $fb,$06
 @song13ch0loop:
 @ref370:
 	.byte $8c,$32,$95,$3a,$85,$40,$95,$44,$85
