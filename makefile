@@ -21,7 +21,7 @@ CONFIG_FILE=$(ROOT_DIR)/ca65-utils/nesgame-chr.cfg
 TEXT2DATA=sound/text2data
 NSF2DATA=sound/nsf2data
 VERSION=1.1       
-SHOW_VERSION_STRING=1
+SHOW_VERSION_STRING=0
 COPYRIGHT=Copyright 2016-2017 cpprograms
 
 ### USER EDITABLE STUFF ENDS HERE
