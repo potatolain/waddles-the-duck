@@ -5995,10 +5995,10 @@ vblank_wait:
 ; TODO: Remove this before shipping. Please?
 HACK_GIMME_ALL_GEMS:
 	lda #255
-	.repeat 20, I
+	.repeat 19, I
 		sta COLLECTIBLE_DATA+I
 	.endrepeat
-	lda #1
+	lda #%00000111
 	sta COLLECTIBLE_DATA+21
 	rts
 	
