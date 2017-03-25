@@ -143,8 +143,8 @@ are for can be looked up from constants in `main.asm`.
 - Initial release
 
 #### 1.1 
-- _Development still in progress_
 - Fixed some obvious level issues
+- Made some level design changes. Tries to make the path very slightly less linear.
 - Now plays sfx when in warp areas
 - Intro is now slower. (And sounds crummier... sorry :()
 - Jump sound effect made less annoying (maybe)
