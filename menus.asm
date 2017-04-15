@@ -95,8 +95,10 @@ load_title:
 		write_string COPYRIGHT, $2361, $1e
 	.endif
 
-	.if DEBUGGING = 1
-		
+	.if ACTION53 = 1
+		write_string .sprintf("Hold select and Start to"), $2304
+		write_string .sprintf("return to the A53 menu"), $2325
+	.elseif DEBUGGING = 1
 		write_string .sprintf("Debug enabled"), $2301
 	.endif
 
@@ -192,14 +194,29 @@ show_title:
 		jsr read_controller
 		
 		jsr vblank_wait
-		
+				
+		.if ACTION53 = 1
+			; Special action53 combo to exit to the game menu.
+			lda ctrlButtons
+			and #CONTROLLER_SELECT
+			beq @no_select
+				lda ctrlButtons
+				and #CONTROLLER_START
+				beq @no_select
+				; Okay, you're holding select and start. Time to do some magic to put you back in the A53 menu.
+				jmp reset_to_action53
+
+			@no_select:
+		.endif
+
+
 		; Check for start button...
 
 		; Make sure we don't count keypresses from last cycle.
 		lda lastCtrlButtons
 		eor #$ff ; flip the bits.
 		and ctrlButtons
-		
+
 		and #CONTROLLER_START
 		bne @game_time
 
@@ -261,6 +278,30 @@ show_title:
 
 		jmp show_ready
 
+
+.if ACTION53 = 1
+reset_to_action53:
+	; NOTE: Code borrowed/ripped-off from exitpatch.py in the A53 menu tools.
+	sei
+	ldx #11
+	@loop:
+		lda @cpsrc,x
+		sta $F0,x
+		dex
+		bpl @loop
+		; X = $FF at end
+		ldy #$80
+		sty $5000
+		lda #$00
+		iny
+		jmp $00F0
+	@cpsrc:
+		sta $8000
+		sty $5000
+		stx $8000
+		jmp ($FFFC)
+
+.endif
 
 load_ready:
 	jsr load_menu

@@ -149,6 +149,7 @@ are for can be looked up from constants in `main.asm`.
 - Intro is now slower. (And sounds crummier... sorry :()
 - Jump sound effect made less annoying (maybe)
 - Added Exit to Title button
+- Added return to A53 option (A53 builds only)
 
 # Tools Used
 
