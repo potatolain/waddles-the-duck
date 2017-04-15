@@ -5438,7 +5438,13 @@ do_pause_screen:
 	store #SPRITE_PAUSE_LETTERS+1, VAR_SPRITE_DATA+73
 	store #SPRITE_PAUSE_LETTERS+4, VAR_SPRITE_DATA+77
 	store #SPRITE_PAUSE_LETTERS+5, VAR_SPRITE_DATA+81
-	store #SPRITE_POINTER, VAR_SPRITE_DATA+85
+
+	store #SPRITE_PAUSE_LETTERS+2, VAR_SPRITE_DATA+85
+	store #SPRITE_PAUSE_LETTERS-$1, VAR_SPRITE_DATA+89
+	store #SPRITE_PAUSE_LETTERS+$f, VAR_SPRITE_DATA+93
+	store #SPRITE_PAUSE_LETTERS+5, VAR_SPRITE_DATA+97
+
+	store #SPRITE_POINTER, VAR_SPRITE_DATA+117
 
 	; Don't touch palettes here - most sprites should have a non-duck color, meaning we can rely on them.
 
@@ -5455,6 +5461,11 @@ do_pause_screen:
 	lda #$a8 ; restart
 	.repeat 8, I
 		sta VAR_SPRITE_DATA+(56+(I*4))
+	.endrepeat
+
+	lda #$b0 ; Exit
+	.repeat 4, I
+		sta VAR_SPRITE_DATA+ 84 + (I*4)
 	.endrepeat
 
 	lda #$60
@@ -5479,8 +5490,14 @@ do_pause_screen:
 		adc #8
 	.endrepeat
 
+	lda #$60 ; Exit
+	.repeat 4, I
+		sta VAR_SPRITE_DATA + 84 + (I*4) + 3
+		adc #8
+	.endrepeat
+
 	lda #$50
-	sta VAR_SPRITE_DATA+87
+	sta VAR_SPRITE_DATA+119
 
 	lda #1
 	jsr music_pause
@@ -5498,7 +5515,7 @@ do_pause_screen:
 		asl
 		clc
 		adc #$a0
-		sta VAR_SPRITE_DATA+84
+		sta VAR_SPRITE_DATA+116
 		
 		jsr read_controller
 		
@@ -5511,16 +5528,22 @@ do_pause_screen:
 			lda pauseOption
 			cmp #0
 			beq @escape_pause
-			jmp @escape_pause_harder
+			cmp #1
+			beq @escape_pause_harder
+			jmp reset ; Escape pause HARDEST.
 		@done_start:
 
 		lda ctrlButtons
 		and #CONTROLLER_UP
 		beq @done_up
+			lda lastCtrlButtons
+			and #CONTROLLER_UP
+			bne @done_up
+
 			lda pauseOption
 			cmp #0
 			beq @done_up
-			store #0, pauseOption
+			dec pauseOption
 			lda #SFX_MENU_TICK
 			ldx #FT_SFX_CH0
 			jsr sfx_play
@@ -5528,10 +5551,14 @@ do_pause_screen:
 		lda ctrlButtons
 		and #CONTROLLER_DOWN
 		beq @done_down
+			lda lastCtrlButtons
+			and #CONTROLLER_DOWN
+			bne @done_down
+
 			lda pauseOption
-			cmp #1
+			cmp #2
 			beq @done_down
-			store #1, pauseOption
+			inc pauseOption
 			lda #SFX_MENU_TICK
 			ldx #FT_SFX_CH0
 			jsr sfx_play

@@ -148,6 +148,7 @@ are for can be looked up from constants in `main.asm`.
 - Now plays sfx when in warp areas
 - Intro is now slower. (And sounds crummier... sorry :()
 - Jump sound effect made less annoying (maybe)
+- Added Exit to Title button
 
 # Tools Used
 
