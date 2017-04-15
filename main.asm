@@ -18,10 +18,10 @@
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
-; $400-41f: Unused
-; $420-4ff: Static collectible data
-; $500-55f: Screen buffer/text backup
-; $560-5ff: more text backup
+; $500-51f: Unused
+; $520-5ff: Static collectible data
+; $400-45f: Screen buffer/text backup
+; $460-4ff: more text backup
 ; $600-6ff: Animated tile buffer (If we need space, this could shrink to 1x, and reloaded every cycle)
 ; $700-7bf: Extended sprite data
 ; $7c0-7ff: Current level collectible data
@@ -131,14 +131,14 @@
 	CHAR_TABLE_START 				= $e1
 	NUM_SYM_TABLE_START	 			= $d0
 	CHAR_SPACE						= $e0
-	COLLECTIBLE_DATA				= $420
+	COLLECTIBLE_DATA				= $520
 	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
-	MAGICAL_BYTE					= $4ff
+	MAGICAL_BYTE					= $5ff
 	MAGICAL_BYTE_VALUE				= $db
 	GAME_BEATEN_BYTE				= $4fe
-	NEXT_ROW_CACHE					= $500
-	NEXT_ROW_ATTRS					= $540 ; This could share space with cache if needed.
-	HUD_TEXT_BACKUP					= $500
+	NEXT_ROW_CACHE					= $400
+	NEXT_ROW_ATTRS					= $440 ; This could share space with cache if needed.
+	HUD_TEXT_BACKUP					= $400
 	ANIMATED_TILE_CACHE				= $600
 	EXTENDED_SPRITE_DATA			= $700
 	LEFT_ATTR_MASK					= %00110011
@@ -425,12 +425,12 @@ clear_memory:
 	; Use a `magical` byte to not reset the $400 memory page on reset, allowing us to keep your gem count through restarts.
 	lda MAGICAL_BYTE
 	cmp #MAGICAL_BYTE_VALUE
-	beq @no_400
+	beq @no_500
 		lda #0
-		sta	$0400, x
-	@no_400:
+		sta	$0500, x
+	@no_500:
 	lda #0
-	sta	$0500, x
+	sta	$0400, x
 	sta	$0600, x
 	sta	$0700, x
 	txa
