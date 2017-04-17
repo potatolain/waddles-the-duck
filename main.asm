@@ -18,7 +18,8 @@
 ; $100-1ff: Stack
 ; $200-2ff: Sprites
 ; $300-3ff: Famitone (technically, it only uses ~186 bytes... we could probably steal some if needed.)
-; $500-51f: Unused
+; $500:		Magical byte to tell us whether collectible data has been tampered with. (Probably)
+; $501-51f: Unused
 ; $520-5ff: Static collectible data
 ; $400-45f: Screen buffer/text backup
 ; $460-4ff: more text backup
@@ -133,7 +134,7 @@
 	CHAR_SPACE						= $e0
 	COLLECTIBLE_DATA				= $520
 	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
-	MAGICAL_BYTE					= $5ff
+	MAGICAL_BYTE					= $500
 	MAGICAL_BYTE_VALUE				= $db
 	GAME_BEATEN_BYTE				= $4fe
 	NEXT_ROW_CACHE					= $400
