@@ -136,7 +136,7 @@
 	COLLECTIBLE_DATA_LENGTH			= $d9 ; Don't add in magical byte
 	MAGICAL_BYTE					= $500
 	MAGICAL_BYTE_VALUE				= $db
-	GAME_BEATEN_BYTE				= $4fe
+	GAME_BEATEN_BYTE				= $5fe
 	NEXT_ROW_CACHE					= $400
 	NEXT_ROW_ATTRS					= $440 ; This could share space with cache if needed.
 	HUD_TEXT_BACKUP					= $400
