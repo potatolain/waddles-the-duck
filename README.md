@@ -2,12 +2,15 @@
 
 **Warning** The engine behind this game has severe issues which will never be fixed. 
 
-You're more than welcome to reference this code, but there are much, much better games out there to look at. I made a number of really crummy mistakes with collisions of all sorts, the story, the title, the warping mechanic, the level design, and pretty much everything else- it is not worth the additional time and effort to fix, nor is that even a realistic thing to do. As such, referencing this code is probably unwise.
+You're more than welcome to reference this code, but there are much, much better games out there to look at. I made a number of 
+really crummy mistakes with collisions of all sorts, the story, the title, the warping mechanic, and a lot of more minor things- 
+it is not worth the additional time and effort to fix, nor is that even a realistic thing to do. As such, referencing this 
+code is probably unwise.
 
-I consider this project a failure, and an embarrassment.
+I consider this project something of a failure, but something to learn from.
 
-This repo remains as a lesson in how not to build a game, and to me, a reminder to get people looking at what I work on as early as possible.
-
+This repo remains as a lesson (to me) in how not to build a game, and more importantly a reminder to get people looking at 
+what I work on as early as possible.
 
 Cheers,
 Chris
