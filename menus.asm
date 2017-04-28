@@ -81,6 +81,7 @@ load_title:
 
 	lda #SONG_TITLE
 	jsr music_play
+	store #0, titleNoWarpVal
 
 	set_ppu_addr $2000
 	store #<(title_screen_base), tempAddr
@@ -95,10 +96,7 @@ load_title:
 		write_string COPYRIGHT, $2361, $1e
 	.endif
 
-	.if ACTION53 = 1
-		write_string .sprintf("Hold select and Start to"), $2304
-		write_string .sprintf("return to the A53 menu"), $2325
-	.elseif DEBUGGING = 1
+	.if DEBUGGING = 1
 		write_string .sprintf("Debug enabled"), $2301
 	.endif
 
@@ -166,13 +164,19 @@ load_title:
 				jsr get_level_gem_count
 				draw_gem_count (.ident(.concat("LVL",.string(I+1),"_COLLECTIBLE_COUNT"))), temp1
 			.endif
+			.if ACTION53
+				jsr MAIN_draw_menu_extras
+			.endif
 		.endrepeat
 		jmp after_no_gems
 
 
 	load_title_no_gems:
-
-		write_string "- Press Start -", $21e8
+		.if ACTION53
+			jsr MAIN_draw_a53_no_levelsel
+		.else
+			jsr MAIN_draw_no_levelsel
+		.endif
 	after_no_gems:
 	reset_ppu_scrolling_and_ctrl
 	jsr vblank_wait
@@ -195,21 +199,6 @@ show_title:
 		
 		jsr vblank_wait
 				
-		.if ACTION53 = 1
-			; Special action53 combo to exit to the game menu.
-			lda ctrlButtons
-			and #CONTROLLER_SELECT
-			beq @no_select
-				lda ctrlButtons
-				and #CONTROLLER_START
-				beq @no_select
-				; Okay, you're holding select and start. Time to do some magic to put you back in the A53 menu.
-				jmp reset_to_action53
-
-			@no_select:
-		.endif
-
-
 		; Check for start button...
 
 		; Make sure we don't count keypresses from last cycle.
@@ -218,7 +207,9 @@ show_title:
 		and ctrlButtons
 
 		and #CONTROLLER_START
-		bne @game_time
+		beq @dododo
+			jmp @game_time
+		@dododo:
 
 		lda GAME_BEATEN_BYTE
 		cmp #0
@@ -231,6 +222,12 @@ show_title:
 				and #CONTROLLER_UP
 				bne @no_up
 				lda temp5
+				.if ACTION53
+					cmp #(NUMBER_OF_REGULAR_LEVELS+1)
+					bne @no_special
+						dec temp5 ; Second dec for action53
+					@no_special:
+				.endif
 				cmp #0
 				beq @no_up
 				dec temp5
@@ -245,8 +242,18 @@ show_title:
 				and #CONTROLLER_DOWN
 				bne @no_down
 				lda temp5
-				cmp #NUMBER_OF_REGULAR_LEVELS-1
-				bcs @no_down
+				.if ACTION53
+					cmp #NUMBER_OF_REGULAR_LEVELS-1
+					beq @exitopt
+					bcs @no_down
+					jmp @after_exitopt
+					@exitopt:
+					inc temp5 ; Extra add for action53 jump
+					@after_exitopt:
+				.else
+					cmp #NUMBER_OF_REGULAR_LEVELS-1
+					bcs @no_down
+				.endif
 				inc temp5
 				lda #SFX_MENU
 				ldx #FT_SFX_CH0
@@ -266,11 +273,73 @@ show_title:
 			sta VAR_SPRITE_DATA+3
 			lda #0
 			sta VAR_SPRITE_DATA+2
+			jmp @after_level_select
 		@no_level_select:
+			.if ACTION53
+				lda ctrlButtons
+				and #CONTROLLER_UP
+				beq @no_upb
+					lda lastCtrlButtons
+					and #CONTROLLER_UP
+					bne @no_upb
+					lda titleNoWarpVal
+					cmp #0
+					beq @no_upb
+					store #0, titleNoWarpVal
+					lda #SFX_MENU
+					ldx #FT_SFX_CH0
+					jsr sfx_play
+				@no_upb:
+				lda ctrlButtons
+				and #CONTROLLER_DOWN
+				beq @no_downb
+					lda lastCtrlButtons
+					and #CONTROLLER_DOWN
+					bne @no_downb
+					lda titleNoWarpVal
+					cmp #1
+					beq @no_downb
+					store #1, titleNoWarpVal
+					lda #SFX_MENU
+					ldx #FT_SFX_CH0
+					jsr sfx_play
+				@no_downb:
+				lda #SPRITE_POINTER
+				sta VAR_SPRITE_DATA+1
+				lda titleNoWarpVal
+				asl
+				asl
+				asl ; multiply offset by 8
+				asl
+				adc #TITLE_CURSOR_Y_OFFSET+8
+				sta VAR_SPRITE_DATA
+				lda #TITLE_CURSOR_X_OFFSET+24
+				sta VAR_SPRITE_DATA+3
+				lda #0
+				sta VAR_SPRITE_DATA+2
+
+
+			.endif
+		@after_level_select:
 
 		jmp @loopa
 	@game_time: 
+		.if ACTION53
+			lda titleNoWarpVal
+			cmp #1
+			bne @no_exit
+				jmp reset_to_action53
+		@no_exit:
+		.endif
+
 		lda temp5
+		.if ACTION53
+			cmp #NUMBER_OF_REGULAR_LEVELS+1
+			bne @doit
+				; If you selected to go back to a53, we'll send ya...
+				jmp reset_to_action53
+			@doit:
+		.endif
 		sta currentLevel
 		lda #SFX_MENU
 		ldx #FT_SFX_CH0

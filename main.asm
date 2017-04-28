@@ -127,6 +127,7 @@
 	dimensionSwapTimer:				.res 1
 	hasHitLastLevelWarpThing:		.res 1 ; Candidate for best variable name ever... if this is non-zero, we won't flip dimensions in level 9 anymore.
 	isMakingWarpySounds:			.res 1
+	titleNoWarpVal:					.res 1
 
 
 	CHAR_TABLE_START 				= $e1
@@ -6028,6 +6029,20 @@ HACK_GIMME_ALL_GEMS:
 	.endrepeat
 	lda #%00000111
 	sta COLLECTIBLE_DATA+21
+	rts
+
+; Moving some chunky title stuff into free space in the kernel. (Kinda gross, but eh... easier than refactoring right now)
+MAIN_draw_menu_extras:
+	write_string "Exit to Menu", $21a7+((NUMBER_OF_REGULAR_LEVELS+1)*$20)
+	rts
+
+MAIN_draw_a53_no_levelsel:
+	write_string " Start Game", $21ca
+	write_string "Exit to Menu", $220a
+	rts
+
+MAIN_draw_no_levelsel:
+	write_string "- Press Start -", $21e8
 	rts
 	
 ;;; 
