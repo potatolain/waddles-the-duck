@@ -206,7 +206,7 @@ show_title:
 		eor #$ff ; flip the bits.
 		and ctrlButtons
 
-		and #CONTROLLER_START
+		and #CONTROLLER_START+CONTROLLER_A
 		beq @dododo
 			jmp @game_time
 		@dododo:
