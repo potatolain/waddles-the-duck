@@ -107,7 +107,7 @@ build_action53: generate_constants sound_files convert_levels convert_sprites co
 	cd bin && $(MAIN_COMPILER) --config $(CONFIG_FILE) -t nes -o main-53.nes -Wa "-D DEBUGGING=0 -D ACTION53=1" ../main.asm
 	
 build_debug: generate_constants sound_files convert_levels convert_sprites convert_graphics convert_nametables
-	cd bin && ca65 -g -o main.o ../main.asm -D DEBUGGING=1
+	cd bin && ca65 -g -o main.o ../main.asm -D DEBUGGING=1 -D ACTION53=0
 	cd bin && ld65 -o main.nes --config $(CONFIG_FILE) --dbgfile main.nes.dbg main.o
 
 fceux:
