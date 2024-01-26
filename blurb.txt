@@ -1,7 +1,5 @@
 Name: 		Waddles the Duck
 
-Submitted By: 	cppchriscpp
-
 Category:	1 (Main competition)
 
 Description:  	You are a duck taken out of his own timeline, trying to find his way home. 
@@ -18,7 +16,7 @@ Rom info:	Mapper 2 (UNROM)
 		Filesize 64k
 		
 
-Credits:	cppchriscpp - Code/Art/Music
+Credits:	potatolain - Code/Art/Music
 		Turbolence88 - First Play Tester
 		Pix3m - Title font (Alagard)
 		Zaratustra Productions - Inspiration from the game Eversion

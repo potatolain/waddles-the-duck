@@ -1,31 +1,26 @@
 # Waddles the Duck
 
-**Warning** The engine behind this game has severe issues which will never be fixed. 
+**Info** The engine behind this game has major issues, and will not see further attention. Proceed carefully.
 
 You're more than welcome to reference this code, but there are much, much better games out there to look at. I made a number of 
-really crummy mistakes with collisions of all sorts, the story, the title, the warping mechanic, and a lot of more minor things- 
-it is not worth the additional time and effort to fix, nor is that even a realistic thing to do. As such, referencing this 
-code is probably unwise.
+really crummy mistakes with collisions of all sorts, the story, the title, the warping mechanic, and a lot of more minor things. 
+As such, referencing this code is probably unwise.
 
-I consider this project something of a failure, but something to learn from.
+I consider this project something to learn from, more than a good example.
 
-This repo remains as a lesson (to me) in how not to build a game, and more importantly a reminder to get people looking at 
-what I work on as early as possible.
-
-Cheers,
-Chris
+Cheers
 
 -----
 
 ![Waddles](http://cpprograms.net/wp-content/uploads/main-6.png)!
 
-Waddles the Duck is a new NES game developed in 2016/2017 for the [2016 NESDev Competition](http://nesdevcompo.nintendoage.com/contest16/). 
+Waddles the Duck is a new NES game developed in 2016/2017 for the 2016 NESDev Competition. 
 
 The basic story is, you're a duck that was taken out of his timeline by a mysterious force, trying to make your way home.
 
 This is here to hopefully help someone figure out how to put together an NES game. Hopefully there are some good examples somewhere
 in this project. That said, this project was developed with a pretty strict deadline, so some corners were cut, and much of this is not well 
-organized, nor well documented. If you get completely stuck, please reach out to the author! (@cppchriscpp)
+organized, nor well documented. If you get completely stuck, please reach out to the author! (admin@cpprograms.net)
 
 ## Local Setup
 

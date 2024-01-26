@@ -1,7 +1,6 @@
 {
 	"version": "0.0.1",
 	"name": "nes-compo-level-converter",
-	"author": "cppchriscpp <admin@cpprograms.net>",
 	"license": "MIT",
 	"dependencies": {},
 	"engines": {
