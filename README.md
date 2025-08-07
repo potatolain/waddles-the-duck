@@ -12,7 +12,7 @@ Cheers
 
 -----
 
-![Waddles](http://cpprograms.net/wp-content/uploads/main-6.png)!
+![Waddles](https://igwgames.comt/wp-content/uploads/main-6.png)!
 
 Waddles the Duck is a new NES game developed in 2016/2017 for the 2016 NESDev Competition. 
 
@@ -20,7 +20,7 @@ The basic story is, you're a duck that was taken out of his timeline by a myster
 
 This is here to hopefully help someone figure out how to put together an NES game. Hopefully there are some good examples somewhere
 in this project. That said, this project was developed with a pretty strict deadline, so some corners were cut, and much of this is not well 
-organized, nor well documented. If you get completely stuck, please reach out to the author! (admin@cpprograms.net)
+organized, nor well documented. If you get completely stuck, please reach out to the author! (admin@igwgames.com)
 
 ## Local Setup
 
@@ -33,7 +33,7 @@ but I apologize for the potentially painful setup.
 
 After checking out this git repository to a fresh directory, follow the steps below to get compiling up and working.
 
-1. Install [cc65](http://cc65.github.io/cc65/), and get it on your system's PATH. (How you do this depends on your OS - search google for details)
+1. Install [cc65](http://cc65.github.io/cc65/), and get it on your system's PATH. (How you do this depends on your OS - search google for details) (NOTE: This must be the version from 2013, not the latest version)
 2. (Windows Only) Install [Gnu on Windows (GOW)](https://github.com/bmatzelle/gow/wiki), or something like Cygwin to use unix commands. 
 3. Install [nodejs](https://nodejs.org/en/) 4.2 or later for some level conversion scripts.
 4. Download and install tools as required from the tools/ folder. Each folder has a readme explaining its purpose. 
